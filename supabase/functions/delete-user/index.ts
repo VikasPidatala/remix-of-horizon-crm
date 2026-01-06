@@ -116,6 +116,14 @@ serve(async (req) => {
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (deleteError) {
+      // Handle "User not found" gracefully - user may already be deleted
+      if (deleteError.message?.includes('User not found') || deleteError.message?.includes('not found')) {
+        console.log(`User ${userId} already deleted or not found, treating as success`);
+        return new Response(
+          JSON.stringify({ success: true, alreadyDeleted: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
         JSON.stringify({ error: deleteError.message }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
