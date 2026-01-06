@@ -152,20 +152,38 @@ export default function UserList() {
   };
 
   const handleBulkDelete = async () => {
-    try {
-      for (const id of selectedIds) {
-        await supabase.functions.invoke('delete-user', {
+    const idsToDelete = Array.from(selectedIds);
+    let successCount = 0;
+    let failCount = 0;
+    
+    // Close dialog immediately and show progress
+    setShowBulkDeleteDialog(false);
+    
+    // Delete sequentially to avoid race conditions
+    for (const id of idsToDelete) {
+      try {
+        const { error } = await supabase.functions.invoke('delete-user', {
           body: { userId: id }
         });
+        if (!error) {
+          successCount++;
+          // Update UI immediately for each successful deletion
+          setUsers(prev => prev.filter(u => u.id !== id));
+        } else {
+          failCount++;
+        }
+      } catch {
+        failCount++;
       }
-      setUsers(prev => prev.filter(u => !selectedIds.has(u.id)));
-      toast.success(`${selectedIds.size} user(s) deleted successfully`);
-      setSelectedIds(new Set());
-      setShowBulkDeleteDialog(false);
-    } catch (error: any) {
-      toast.error('Failed to delete some users', {
-        description: error.message
-      });
+    }
+    
+    setSelectedIds(new Set());
+    
+    if (successCount > 0) {
+      toast.success(`${successCount} user(s) deleted successfully`);
+    }
+    if (failCount > 0) {
+      toast.error(`Failed to delete ${failCount} user(s)`);
     }
   };
 
