@@ -198,19 +198,32 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     // Prevent multiple simultaneous refreshes
     if (isRefreshing.current) return;
     isRefreshing.current = true;
-    setLoading(true);
+    
+    // Only set loading true on initial load (when no data exists)
+    const isInitialLoad = projects.length === 0 && leads.length === 0;
+    if (isInitialLoad) {
+      setLoading(true);
+    }
+    
     try {
-      const projectsList = await fetchProjects();
+      // Fetch projects and announcements in parallel first
+      const [projectsList] = await Promise.all([
+        fetchProjects(),
+        fetchAnnouncements(),
+      ]);
+      
+      // Then fetch leads (depends on projects)
       const leadsList = await fetchLeads(projectsList);
+      
+      // Then fetch tasks (depends on leads)
       await fetchTasks(leadsList);
-      await fetchAnnouncements();
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setLoading(false);
       isRefreshing.current = false;
     }
-  }, [fetchProjects, fetchLeads, fetchTasks, fetchAnnouncements]);
+  }, [fetchProjects, fetchLeads, fetchTasks, fetchAnnouncements, projects.length, leads.length]);
 
   // Initial fetch
   useEffect(() => {

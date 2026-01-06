@@ -9,6 +9,7 @@ import LeaveFormModal from './LeaveFormModal';
 import LeaveRejectDialog from './LeaveRejectDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -29,9 +30,19 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { Search, Plus, Calendar, Check, X, FileText, ExternalLink, Loader2, Info } from 'lucide-react';
+import { Search, Plus, Calendar, Check, X, FileText, ExternalLink, Loader2, Info, Trash2 } from 'lucide-react';
 import { format, differenceInDays, isWithinInterval, startOfMonth, endOfMonth, startOfDay, endOfDay, isSameDay } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -55,10 +66,11 @@ interface LeaveRecord {
 interface LeaveListProps {
   canApprove?: boolean;
   canCreate?: boolean;
+  canDelete?: boolean;
   showOnlyPending?: boolean;
 }
 
-export default function LeaveList({ canApprove = false, canCreate = false, showOnlyPending = false }: LeaveListProps) {
+export default function LeaveList({ canApprove = false, canCreate = false, canDelete = false, showOnlyPending = false }: LeaveListProps) {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
@@ -70,12 +82,19 @@ export default function LeaveList({ canApprove = false, canCreate = false, showO
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedLeaveForReject, setSelectedLeaveForReject] = useState<LeaveRecord | null>(null);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(undefined);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteLeaveId, setDeleteLeaveId] = useState<string | null>(null);
 
   // Fetch leaves from Supabase
-  const fetchLeaves = async () => {
+  const fetchLeaves = async (showLoader = true) => {
     if (!user) return;
     
-    setLoading(true);
+    // Only show loader on initial load
+    if (showLoader && leaves.length === 0) {
+      setLoading(true);
+    }
+    
     try {
       const { data, error } = await supabase
         .from('leaves')
@@ -98,7 +117,7 @@ export default function LeaveList({ canApprove = false, canCreate = false, showO
   };
 
   useEffect(() => {
-    fetchLeaves();
+    fetchLeaves(true);
   }, [user]);
 
   // Get unique names for filter
@@ -153,6 +172,96 @@ export default function LeaveList({ canApprove = false, canCreate = false, showO
       return matchesSearch && matchesStatus && matchesName && hasAccess && matchesCalendar;
     });
   }, [leaves, searchQuery, statusFilter, nameFilter, user, calendarDate]);
+
+  const allSelected = filteredLeaves.length > 0 && filteredLeaves.every(l => selectedIds.has(l.id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredLeaves.map(l => l.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  // Check if current user can delete a leave
+  const canDeleteLeave = (leave: LeaveRecord): boolean => {
+    if (!canDelete) return false;
+    
+    // Admin can delete any leave
+    if (user?.role === 'admin') return true;
+    
+    // Manager can delete staff leaves
+    if (user?.role === 'manager' && leave.user_role === 'staff') return true;
+    
+    // Staff can only delete their own pending leaves
+    if (user?.role === 'staff' && leave.user_id === user.id && leave.status === 'pending') return true;
+    
+    return false;
+  };
+
+  const handleDeleteLeave = async (leaveId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('leaves')
+        .delete()
+        .eq('id', leaveId);
+
+      if (error) {
+        console.error('Error deleting leave:', error);
+        toast.error('Failed to delete leave');
+        return;
+      }
+
+      setLeaves(prev => prev.filter(l => l.id !== leaveId));
+      
+      void logActivity({
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        module: 'leaves',
+        action: 'deleted',
+        details: `deleted a leave request`,
+      });
+
+      toast.success('Leave request deleted');
+    } catch (error) {
+      console.error('Error deleting leave:', error);
+      toast.error('Failed to delete leave');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      for (const id of selectedIds) {
+        await supabase.from('leaves').delete().eq('id', id);
+      }
+      setLeaves(prev => prev.filter(l => !selectedIds.has(l.id)));
+      toast.success(`${selectedIds.size} leave(s) deleted successfully`);
+      setSelectedIds(new Set());
+      setShowDeleteDialog(false);
+    } catch (error) {
+      toast.error('Failed to delete some leaves');
+    }
+  };
+
+  const handleSingleDelete = async () => {
+    if (!deleteLeaveId) return;
+    await handleDeleteLeave(deleteLeaveId);
+    setDeleteLeaveId(null);
+  };
 
   // Check if current user can view a leave's document
   const canViewDocument = (leave: LeaveRecord): boolean => {
@@ -437,6 +546,17 @@ export default function LeaveList({ canApprove = false, canCreate = false, showO
               </PopoverContent>
             </Popover>
           )}
+
+          {someSelected && canDelete && (
+            <Button 
+              variant="destructive" 
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete ({selectedIds.size})
+            </Button>
+          )}
         </div>
 
         {canCreate && (
@@ -496,13 +616,22 @@ export default function LeaveList({ canApprove = false, canCreate = false, showO
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              {canDelete && (
+                <TableHead className="w-12">
+                  <Checkbox 
+                    checked={allSelected} 
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
+              )}
               <TableHead className="font-semibold">Employee</TableHead>
               <TableHead className="font-semibold">Leave Type</TableHead>
               <TableHead className="font-semibold">Duration</TableHead>
               <TableHead className="font-semibold">Reason</TableHead>
               <TableHead className="font-semibold">Document</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
-              {canApprove && <TableHead className="font-semibold w-32">Actions</TableHead>}
+              {(canApprove || canDelete) && <TableHead className="font-semibold w-32">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -512,6 +641,15 @@ export default function LeaveList({ canApprove = false, canCreate = false, showO
                 className="table-row-hover animate-fade-in"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
+                {canDelete && (
+                  <TableCell>
+                    <Checkbox 
+                      checked={selectedIds.has(leave.id)} 
+                      onCheckedChange={() => toggleSelect(leave.id)}
+                      aria-label={`Select ${leave.user_name}`}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   <div>
                     <p className="font-medium text-foreground">{leave.user_name}</p>
@@ -569,30 +707,43 @@ export default function LeaveList({ canApprove = false, canCreate = false, showO
                     )}
                   </div>
                 </TableCell>
-                {canApprove && (
+                {(canApprove || canDelete) && (
                   <TableCell>
-                    {canApproveLeave(leave) ? (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
-                          onClick={() => handleApprove(leave.id)}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
+                    <div className="flex items-center gap-2">
+                      {canApproveLeave(leave) && (
+                        <>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
+                            onClick={() => handleApprove(leave.id)}
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => openRejectDialog(leave)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                      {canDeleteLeave(leave) && (
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => openRejectDialog(leave)}
+                          onClick={() => setDeleteLeaveId(leave.id)}
                         >
-                          <X className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
+                      )}
+                      {!canApproveLeave(leave) && !canDeleteLeave(leave) && (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </div>
                   </TableCell>
                 )}
               </TableRow>
@@ -622,6 +773,42 @@ export default function LeaveList({ canApprove = false, canCreate = false, showO
         onReject={handleRejectWithReason}
         employeeName={selectedLeaveForReject?.user_name || ''}
       />
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Selected Leaves</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} leave request(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Single Delete Confirmation */}
+      <AlertDialog open={!!deleteLeaveId} onOpenChange={() => setDeleteLeaveId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Leave Request</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this leave request? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSingleDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

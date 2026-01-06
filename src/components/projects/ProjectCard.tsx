@@ -1,7 +1,7 @@
 import { Project } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building, MapPin, Calendar, IndianRupee, Eye, Edit } from 'lucide-react';
+import { Building, MapPin, Calendar, IndianRupee, Eye, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -10,7 +10,9 @@ interface ProjectCardProps {
   delay?: number;
   onView?: (project: Project) => void;
   onEdit?: (project: Project) => void;
+  onDelete?: (project: Project) => void;
   canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 const statusColors: Record<string, string> = {
@@ -19,7 +21,7 @@ const statusColors: Record<string, string> = {
   completed: 'bg-muted text-muted-foreground border-border',
 };
 
-export default function ProjectCard({ project, delay = 0, onView, onEdit, canEdit = false }: ProjectCardProps) {
+export default function ProjectCard({ project, delay = 0, onView, onEdit, onDelete, canEdit = false, canDelete = false }: ProjectCardProps) {
   const formatPrice = (val: number) => {
     if (val >= 10000000) return `₹${(val / 10000000).toFixed(1)} Cr`;
     if (val >= 100000) return `₹${(val / 100000).toFixed(0)} L`;
@@ -107,7 +109,7 @@ export default function ProjectCard({ project, delay = 0, onView, onEdit, canEdi
             onClick={() => onView?.(project)}
           >
             <Eye className="w-4 h-4 mr-2" />
-            View Details
+            View
           </Button>
           {canEdit && (
             <Button 
@@ -118,6 +120,16 @@ export default function ProjectCard({ project, delay = 0, onView, onEdit, canEdi
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit
+            </Button>
+          )}
+          {canDelete && (
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+              onClick={() => onDelete?.(project)}
+            >
+              <Trash2 className="w-4 h-4" />
             </Button>
           )}
         </div>

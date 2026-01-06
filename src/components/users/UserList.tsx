@@ -73,9 +73,12 @@ export default function UserList() {
   const managers = users.filter(u => u.role === 'manager');
 
   // Fetch users from database
-  const fetchUsers = async () => {
+  const fetchUsers = async (showLoader = true) => {
     try {
-      setLoading(true);
+      // Only show loader on initial load
+      if (showLoader && users.length === 0) {
+        setLoading(true);
+      }
       
       // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
@@ -85,20 +88,22 @@ export default function UserList() {
 
       if (profilesError) throw profilesError;
 
-      // Fetch roles for all users
-      const usersWithRoles: DBUser[] = [];
-      for (const profile of profiles || []) {
+      // Fetch all roles in parallel
+      const rolePromises = (profiles || []).map(async (profile) => {
         const { data: roleData } = await supabase.rpc('get_user_role', {
           _user_id: profile.id
         });
-        
-        if (roleData !== 'admin') { // Don't show admin in the list
-          usersWithRoles.push({
-            ...profile,
-            role: roleData as UserRole
-          });
-        }
-      }
+        return { profile, role: roleData as UserRole };
+      });
+
+      const profilesWithRoles = await Promise.all(rolePromises);
+      
+      const usersWithRoles: DBUser[] = profilesWithRoles
+        .filter(({ role }) => role !== 'admin') // Don't show admin in the list
+        .map(({ profile, role }) => ({
+          ...profile,
+          role
+        }));
 
       setUsers(usersWithRoles);
     } catch (error: any) {
@@ -110,7 +115,7 @@ export default function UserList() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsers(true);
   }, []);
 
   const filteredUsers = users.filter(user => {
@@ -187,7 +192,7 @@ export default function UserList() {
 
       if (result.success) {
         toast.success(`User created successfully!`);
-        await fetchUsers();
+        await fetchUsers(false);
         return { success: true, userId: result.userId };
       } else {
         toast.error('Failed to create user', {
@@ -226,7 +231,7 @@ export default function UserList() {
         return { success: false };
       }
 
-      await fetchUsers();
+      await fetchUsers(false);
       return { success: true };
     } catch (error: any) {
       toast.error('Error updating user', { description: error.message });
