@@ -313,6 +313,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
 
+    // Update UI immediately (avoid needing a full refresh / realtime)
+    setLeads(prev =>
+      prev.map(l => (l.id === id ? { ...l, ...data, updatedAt: new Date() } : l))
+    );
+
     if (user) {
       const existing = leads.find(l => l.id === id);
       const name = data.name ?? existing?.name ?? id;
@@ -398,6 +403,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       toast.error('Failed to update task');
       throw error;
     }
+
+    // Update UI immediately (avoid needing a full refresh / realtime)
+    setTasks(prev =>
+      prev.map(t => (t.id === id ? { ...t, ...data, updatedAt: new Date() } : t))
+    );
 
     if (user) {
       const existing = tasks.find(t => t.id === id);

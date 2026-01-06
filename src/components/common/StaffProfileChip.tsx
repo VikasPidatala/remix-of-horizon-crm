@@ -37,8 +37,12 @@ export default function StaffProfileChip({ userId, showDetails = true }: StaffPr
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchProfile() {
       if (!userId) {
+        setProfile(null);
+        setRole('staff');
         setLoading(false);
         return;
       }
@@ -51,53 +55,87 @@ export default function StaffProfileChip({ userId, showDetails = true }: StaffPr
         return;
       }
 
+      setLoading(true);
+
+      const isUuid = (value: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
       try {
-        // Fetch profile by user_id
+        // Support both identifiers:
+        // - auth UUID (profiles.id)
+        // - human login id (profiles.user_id)
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('user_id', userId)
-          .single();
+          .eq(isUuid(userId) ? 'id' : 'user_id', userId)
+          .maybeSingle();
 
         if (profileError && profileError.code !== 'PGRST116') {
           console.error('Error fetching profile:', profileError);
         }
 
-        // Fetch user role
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-          .single();
+        let userRole = 'staff';
+        if (profileData?.id) {
+          // user_roles.user_id is a UUID (auth uid)
+          const { data: roleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', profileData.id)
+            .maybeSingle();
 
-        if (roleError && roleError.code !== 'PGRST116') {
-          console.error('Error fetching role:', roleError);
+          if (roleError && roleError.code !== 'PGRST116') {
+            console.error('Error fetching role:', roleError);
+          }
+
+          userRole = roleData?.role || 'staff';
         }
 
-        const userRole = roleData?.role || 'staff';
-        
-        // Cache the result
-        profileCache[userId] = {
-          profile: profileData,
-          role: userRole
-        };
+        if (cancelled) return;
 
-        setProfile(profileData);
+        // Cache the result under all useful keys to reduce fetches
+        const keys = new Set<string>([userId]);
+        if (profileData?.id) keys.add(profileData.id);
+        if (profileData?.user_id) keys.add(profileData.user_id);
+
+        for (const key of keys) {
+          profileCache[key] = {
+            profile: profileData ?? null,
+            role: userRole,
+          };
+        }
+
+        setProfile(profileData ?? null);
         setRole(userRole);
       } catch (error) {
         console.error('Error fetching profile:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchProfile();
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-primary text-primary-foreground';
+      case 'manager':
+        return 'bg-secondary text-secondary-foreground';
+      case 'staff':
+        return 'bg-accent text-accent-foreground';
+      default:
+        return 'bg-muted text-muted-foreground';
+    }
+  };
 
   if (loading) {
     return <span className="text-muted-foreground text-sm">Loading...</span>;
   }
-  
+
   if (!profile) {
     return <span className="text-muted-foreground text-sm">Unknown</span>;
   }
@@ -105,23 +143,10 @@ export default function StaffProfileChip({ userId, showDetails = true }: StaffPr
   const getInitials = (name: string) => {
     return name
       .split(' ')
-      .map(n => n[0])
+      .map((n) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-primary text-primary-foreground';
-      case 'manager':
-        return 'bg-info text-white';
-      case 'staff':
-        return 'bg-accent text-accent-foreground';
-      default:
-        return 'bg-muted text-muted-foreground';
-    }
   };
 
   const chipContent = (
