@@ -374,8 +374,8 @@ export default function LeadList({
               <span className="truncate">{getProjectName(lead.assignedProject)}</span>
               {!isManagerView && <span className="shrink-0">{formatBudget(lead.budgetMin, lead.budgetMax)}</span>}
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setViewingLead(lead)}>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" size="sm" className="flex-1 min-w-[70px]" onClick={() => setViewingLead(lead)}>
                 <Eye className="w-3.5 h-3.5 mr-1" />
                 View
               </Button>
@@ -383,7 +383,7 @@ export default function LeadList({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
+                  className="flex-1 min-w-[70px]"
                   onClick={() => {
                     setEditingLead(lead);
                     setIsFormOpen(true);
@@ -391,6 +391,17 @@ export default function LeadList({
                 >
                   <Edit className="w-3.5 h-3.5 mr-1" />
                   Edit
+                </Button>
+              )}
+              {canConvert && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="flex-1 min-w-[100px]"
+                  onClick={() => handleConvertToTask(lead)}
+                >
+                  <CheckSquare className="w-3.5 h-3.5 mr-1" />
+                  Convert
                 </Button>
               )}
             </div>
