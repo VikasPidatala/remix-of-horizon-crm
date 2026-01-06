@@ -162,9 +162,9 @@ export default function Login() {
           {/* Giant Logo */}
           <div className="mb-8 animate-scale-in">
             {settings?.logo_url ? (
-              <img 
-                src={settings.logo_url} 
-                alt={appName} 
+              <img
+                src={settings.logo_url}
+                alt={appName}
                 className="w-48 h-48 object-contain drop-shadow-2xl"
               />
             ) : (
