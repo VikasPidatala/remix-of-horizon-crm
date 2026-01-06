@@ -177,8 +177,6 @@ export default function SettingsPage() {
     setIsDeletingAccount(true);
     try {
       // Call delete-user edge function
-      const { data: session } = await supabase.auth.getSession();
-      
       const response = await supabase.functions.invoke('delete-user', {
         body: { userId: user.id },
       });
@@ -187,6 +185,8 @@ export default function SettingsPage() {
 
       toast.success('Account deleted successfully');
       await logout();
+      // Force redirect to /login so signup can trigger when no admin exists
+      window.location.href = '/login';
     } catch (error: any) {
       console.error('Error deleting account:', error);
       toast.error(error.message || 'Failed to delete account');
