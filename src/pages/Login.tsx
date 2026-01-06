@@ -164,7 +164,7 @@ export default function Login() {
             {settings?.logo_url ? (
               <img 
                 src={settings.logo_url} 
-                alt=ESWARI CONNECTS 
+                alt={appName} 
                 className="w-48 h-48 object-contain drop-shadow-2xl"
               />
             ) : (
@@ -176,7 +176,7 @@ export default function Login() {
 
           {/* App Name - Large */}
           <h1 className="text-5xl md:text-6xl font-bold text-center mb-4 animate-fade-in">
-            ESWARI CONNECTS
+            {appName}
           </h1>
 
           {/* Tagline */}
