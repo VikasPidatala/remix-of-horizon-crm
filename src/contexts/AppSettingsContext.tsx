@@ -24,9 +24,9 @@ const defaultSettings: AppSettings = {
   app_name: 'ESWARI CONNECTS',
   logo_url: null,
   favicon_url: null,
-  primary_color: '215 80% 35%',
-  accent_color: '38 95% 55%',
-  sidebar_color: '220 30% 12%',
+  primary_color: '152 45% 28%',
+  accent_color: '45 90% 50%',
+  sidebar_color: '152 35% 15%',
   custom_css: null,
 };
 
