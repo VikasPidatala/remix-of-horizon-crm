@@ -21,7 +21,7 @@ interface AppSettingsContextType {
 
 const defaultSettings: AppSettings = {
   id: '',
-  app_name: 'ESWARI CRM',
+  app_name: 'ESWARI CONNECTS',
   logo_url: null,
   favicon_url: null,
   primary_color: '215 80% 35%',
@@ -54,7 +54,7 @@ export const AppSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
     
     // Update page title
-    document.title = s.app_name || 'ESWARI CRM';
+    document.title = s.app_name || 'ESWARI CONNECTS';
     
     // Remove old custom CSS if exists
     const oldStyle = document.getElementById('custom-app-css');
