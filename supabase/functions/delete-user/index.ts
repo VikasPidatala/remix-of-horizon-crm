@@ -65,6 +65,53 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Deleting user ${userId} and all related data...`);
+
+    // Delete all related data before deleting the user
+    // Delete leads created by this user
+    const { error: leadsError } = await supabaseAdmin
+      .from("leads")
+      .delete()
+      .eq("created_by", userId);
+    if (leadsError) console.log("Error deleting leads:", leadsError.message);
+
+    // Delete tasks assigned to this user
+    const { error: tasksError } = await supabaseAdmin
+      .from("tasks")
+      .delete()
+      .eq("assigned_to", userId);
+    if (tasksError) console.log("Error deleting tasks:", tasksError.message);
+
+    // Delete leaves for this user
+    const { error: leavesError } = await supabaseAdmin
+      .from("leaves")
+      .delete()
+      .eq("user_id", userId);
+    if (leavesError) console.log("Error deleting leaves:", leavesError.message);
+
+    // Delete projects created by this user
+    const { error: projectsError } = await supabaseAdmin
+      .from("projects")
+      .delete()
+      .eq("created_by", userId);
+    if (projectsError) console.log("Error deleting projects:", projectsError.message);
+
+    // Delete announcements created by this user
+    const { error: announcementsError } = await supabaseAdmin
+      .from("announcements")
+      .delete()
+      .eq("created_by", userId);
+    if (announcementsError) console.log("Error deleting announcements:", announcementsError.message);
+
+    // Delete activity logs for this user
+    const { error: activityError } = await supabaseAdmin
+      .from("activity_logs")
+      .delete()
+      .eq("user_id", userId);
+    if (activityError) console.log("Error deleting activity logs:", activityError.message);
+
+    console.log(`All related data deleted for user ${userId}, now deleting auth user...`);
+
     // Delete the user (this will cascade to profiles and user_roles due to ON DELETE CASCADE)
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
