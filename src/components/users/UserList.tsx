@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import UserFormModal from './UserFormModal';
+import UserDeleteConfirmDialog from './UserDeleteConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -263,11 +264,33 @@ export default function UserList() {
     }
   };
 
+  const handleDeactivateUser = async () => {
+    if (!deleteUser) return;
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: 'inactive' })
+        .eq('id', deleteUser.id);
+
+      if (error) throw error;
+
+      setUsers(prev => prev.map(u => 
+        u.id === deleteUser.id ? { ...u, status: 'inactive' } : u
+      ));
+      toast.success(`${deleteUser.name}'s account has been deactivated`);
+    } catch (error: any) {
+      toast.error('Failed to deactivate user', {
+        description: error.message
+      });
+    }
+  };
+
   const handleDeleteUser = async () => {
     if (!deleteUser) return;
     
     try {
-      // Delete via edge function to properly clean up auth user
+      // Delete via edge function to properly clean up auth user and all related data
       const { error } = await supabase.functions.invoke('delete-user', {
         body: { userId: deleteUser.id }
       });
@@ -275,8 +298,7 @@ export default function UserList() {
       if (error) throw error;
 
       setUsers(prev => prev.filter(u => u.id !== deleteUser.id));
-      toast.success('User deleted successfully');
-      setDeleteUser(null);
+      toast.success('User and all associated data deleted successfully');
     } catch (error: any) {
       toast.error('Failed to delete user', {
         description: error.message
@@ -479,22 +501,14 @@ export default function UserList() {
         editUser={editingUser}
       />
 
-      <AlertDialog open={!!deleteUser} onOpenChange={() => setDeleteUser(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete User</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {deleteUser?.name}? This action cannot be undone. All data created by this user will also be deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UserDeleteConfirmDialog
+        open={!!deleteUser}
+        onClose={() => setDeleteUser(null)}
+        onDeactivate={handleDeactivateUser}
+        onDelete={handleDeleteUser}
+        userName={deleteUser?.name || ''}
+        userId={deleteUser?.id || ''}
+      />
 
       <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
         <AlertDialogContent>
