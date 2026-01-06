@@ -299,7 +299,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
-  }, []);
+    // Refresh adminExists after logout (e.g., after admin self-deletion)
+    setTimeout(() => {
+      checkAdminExists();
+    }, 0);
+  }, [checkAdminExists]);
 
   const hasPermission = useCallback((module: string, action: string): boolean => {
     if (!user) return false;

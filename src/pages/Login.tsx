@@ -46,7 +46,7 @@ export default function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      navigate(`/${user.role}`);
+      navigate(`/${user.role}`, { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
 

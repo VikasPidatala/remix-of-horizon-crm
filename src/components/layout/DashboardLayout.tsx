@@ -26,7 +26,8 @@ export default function DashboardLayout({ requiredRole }: DashboardLayoutProps) 
 
   // Only redirect if not loading AND definitely not authenticated
   if (!isLoading && !isAuthenticated && !session) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    // After logout or if no admin, redirect to /login (which handles signup mode)
+    return <Navigate to="/login" replace />;
   }
 
   // Wait for user data if we have a session but no user yet
