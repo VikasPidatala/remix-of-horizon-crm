@@ -148,7 +148,7 @@ export default function Login() {
     );
   }
 
-  const appName = settings?.app_name || 'ESWARI CRM';
+  const appName = settings?.app_name || 'ESWARI CONNECTS';
 
   return (
     <div className="min-h-screen flex">
