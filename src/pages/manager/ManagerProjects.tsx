@@ -6,7 +6,7 @@ export default function ManagerProjects() {
     <div className="min-h-screen">
       <TopBar title="Projects" subtitle="Manage real estate projects" />
       <div className="p-4 md:p-6">
-        <ProjectList canCreate={true} canEdit={true} />
+        <ProjectList canCreate={true} canEdit={true} canDelete={false} />
       </div>
     </div>
   );
