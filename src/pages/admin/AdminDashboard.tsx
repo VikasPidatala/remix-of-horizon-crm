@@ -8,13 +8,11 @@ import ProjectStatusChart from '@/components/dashboard/ProjectStatusChart';
 import RemindersWidget from '@/components/dashboard/RemindersWidget';
 import CalendarView from '@/components/dashboard/CalendarView';
 import AnnouncementBanner from '@/components/announcements/AnnouncementBanner';
-import HolidayCalendarModal from '@/components/holidays/HolidayCalendarModal';
-import { Button } from '@/components/ui/button';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ActivityLog } from '@/types';
-import { ClipboardList, CheckSquare, Building, CalendarOff, Users, TrendingUp, CalendarDays } from 'lucide-react';
+import { ClipboardList, CheckSquare, Building, CalendarOff, Users, TrendingUp } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { leads, tasks, projects, announcements } = useData();
@@ -22,7 +20,6 @@ export default function AdminDashboard() {
   const [pendingLeaves, setPendingLeaves] = useState(0);
   const [teamCount, setTeamCount] = useState(0);
   const [recentActivities, setRecentActivities] = useState<ActivityLog[]>([]);
-  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -73,12 +70,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen">
-      <TopBar title="Admin Dashboard" subtitle="Welcome back! Here's your overview.">
-        <Button onClick={() => setHolidayModalOpen(true)} variant="outline" className="gap-2">
-          <CalendarDays className="h-4 w-4" />
-          <span className="hidden sm:inline">Holiday Calendar</span>
-        </Button>
-      </TopBar>
+      <TopBar title="Admin Dashboard" subtitle="Welcome back! Here's your overview." />
       
       <div className="p-6 space-y-6">
         {/* Announcements */}
@@ -171,8 +163,6 @@ export default function AdminDashboard() {
         {/* Calendar View */}
         <CalendarView leads={leads} tasks={tasks} title="All Events Calendar" />
       </div>
-
-      <HolidayCalendarModal open={holidayModalOpen} onOpenChange={setHolidayModalOpen} />
     </div>
   );
 }

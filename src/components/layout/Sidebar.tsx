@@ -20,10 +20,12 @@ import {
   Megaphone,
   Bell,
   Palette,
+  CalendarDays,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { mockLeads, mockTasks } from '@/data/mockData';
 import { isAfter, isBefore, addDays, isToday } from 'date-fns';
+import HolidayCalendarModal from '@/components/holidays/HolidayCalendarModal';
 
 interface NavItem {
   label: string;
@@ -78,6 +80,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
+  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
 
   useEffect(() => {
     const count = getRemindersCount();
@@ -157,6 +160,21 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
             </Link>
           );
         })}
+        
+        {/* Holiday Calendar Button */}
+        <button
+          onClick={() => {
+            setHolidayModalOpen(true);
+            handleNavClick();
+          }}
+          className={cn(
+            "nav-link relative w-full",
+            collapsed && "justify-center px-3"
+          )}
+        >
+          <CalendarDays className="w-5 h-5 shrink-0" />
+          {!collapsed && <span>Holiday Calendar</span>}
+        </button>
       </nav>
 
       {/* User Section */}
@@ -196,6 +214,8 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
           )}
         </div>
       </div>
+
+      <HolidayCalendarModal open={holidayModalOpen} onOpenChange={setHolidayModalOpen} />
     </aside>
   );
 }
