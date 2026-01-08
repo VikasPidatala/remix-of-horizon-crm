@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Edit, Trash2, CalendarDays, Download, ImageIcon, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { format, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Edit, Trash2, CalendarDays, Download, ImageIcon, ZoomIn, ZoomOut, RotateCcw, Sparkles } from 'lucide-react';
+import { format, parseISO, isBefore, startOfDay, isWithinInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -149,19 +150,25 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
 
   const today = startOfDay(new Date());
 
+  const isHolidayToday = (holiday: Holiday) => {
+    const start = startOfDay(parseISO(holiday.start_date));
+    const end = startOfDay(parseISO(holiday.end_date));
+    return isWithinInterval(today, { start, end });
+  };
+
+  const upcomingHolidays = holidays.filter((h) => !isBefore(parseISO(h.end_date), today));
+  const pastHolidays = holidays.filter((h) => isBefore(parseISO(h.end_date), today));
+
   const filteredHolidays = holidays.filter((holiday) => {
     const endDate = parseISO(holiday.end_date);
-    const startDate = parseISO(holiday.start_date);
     
     if (filter === 'upcoming') {
-      // Upcoming: end_date is today or in the future
       return !isBefore(endDate, today);
     }
     if (filter === 'past') {
-      // Past: end_date is before today
       return isBefore(endDate, today);
     }
-    return true; // 'all'
+    return true;
   });
 
   return (
@@ -186,9 +193,24 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
           {/* Filter Tabs */}
           <Tabs value={filter} onValueChange={(v) => setFilter(v as 'all' | 'upcoming' | 'past')} className="shrink-0">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-              <TabsTrigger value="past">Past</TabsTrigger>
+              <TabsTrigger value="all" className="gap-2">
+                All
+                <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
+                  {holidays.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="upcoming" className="gap-2">
+                Upcoming
+                <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
+                  {upcomingHolidays.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="past" className="gap-2">
+                Past
+                <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
+                  {pastHolidays.length}
+                </Badge>
+              </TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -204,12 +226,21 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
                   </p>
                 </div>
               ) : (
-                filteredHolidays.map((holiday, index) => (
+                filteredHolidays.map((holiday, index) => {
+                  const isTodayHoliday = isHolidayToday(holiday);
+                  return (
                   <Card 
                     key={holiday.id} 
-                    className="overflow-hidden animate-slide-up"
+                    className={`overflow-hidden animate-slide-up ${isTodayHoliday ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
+                    {/* Today indicator */}
+                    {isTodayHoliday && (
+                      <div className="bg-primary text-primary-foreground px-3 py-1.5 flex items-center gap-2 text-sm font-medium">
+                        <Sparkles className="h-4 w-4" />
+                        Happening Today!
+                      </div>
+                    )}
                     <CardContent className="p-0">
                       <div className="flex flex-col sm:flex-row">
                         {/* Image Section */}
@@ -306,7 +337,8 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
                       </div>
                     </CardContent>
                   </Card>
-                ))
+                  );
+                })
               )}
             </div>
           </ScrollArea>
