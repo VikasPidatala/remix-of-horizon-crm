@@ -209,35 +209,37 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                Holiday Calendar
-              </span>
-              {overviewImageUrl && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setShowOverviewImage(true)}
-                  className="flex items-center gap-2"
-                >
-                  <ImageIcon className="h-4 w-4" />
-                  View All Holidays
-                </Button>
-              )}
+          <DialogHeader className="pr-8">
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              Holiday Calendar
             </DialogTitle>
           </DialogHeader>
+
+          {/* View All Holidays Button - shown for all when image exists */}
+          {overviewImageUrl && (
+            <div className="flex justify-end -mt-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowOverviewImage(true)}
+                className="flex items-center gap-2"
+              >
+                <ImageIcon className="h-4 w-4" />
+                View All Holidays
+              </Button>
+            </div>
+          )}
 
           {/* Admin Overview Image Upload Section */}
           {isAdmin && (
             <div className="border rounded-lg p-4 bg-muted/30">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0">
                   <h4 className="font-medium text-sm">Holidays Overview Image</h4>
                   <p className="text-xs text-muted-foreground">Upload a single image showing all holidays (visible to managers & staff)</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {overviewImageUrl && (
                     <Button 
                       variant="ghost" 
