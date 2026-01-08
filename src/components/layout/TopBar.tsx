@@ -18,9 +18,10 @@ interface TopBarProps {
   title: string;
   subtitle?: string;
   showBackButton?: boolean;
+  children?: React.ReactNode;
 }
 
-export default function TopBar({ title, subtitle, showBackButton = true }: TopBarProps) {
+export default function TopBar({ title, subtitle, showBackButton = true, children }: TopBarProps) {
   const { user } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
@@ -69,6 +70,7 @@ export default function TopBar({ title, subtitle, showBackButton = true }: TopBa
       </div>
 
       <div className="flex items-center gap-2 md:gap-4 shrink-0">
+        {children}
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
