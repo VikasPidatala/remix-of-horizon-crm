@@ -150,30 +150,33 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
-          date: string
+          end_date: string
           id: string
           image_url: string | null
           message: string | null
+          start_date: string
           title: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           created_by: string
-          date: string
+          end_date?: string
           id?: string
           image_url?: string | null
           message?: string | null
+          start_date: string
           title: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           created_by?: string
-          date?: string
+          end_date?: string
           id?: string
           image_url?: string | null
           message?: string | null
+          start_date?: string
           title?: string
           updated_at?: string
         }
