@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,9 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Holiday {
   id: string;
@@ -30,7 +32,59 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
   const [date, setDate] = useState<Date | undefined>(holiday?.date ? new Date(holiday.date) : undefined);
   const [message, setMessage] = useState(holiday?.message || '');
   const [imageUrl, setImageUrl] = useState(holiday?.image_url || '');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(holiday?.image_url || null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size must be less than 5MB');
+        return;
+      }
+      setImageFile(file);
+      setImageUrl('');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('holiday-images')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      toast.error('Failed to upload image');
+      return null;
+    }
+
+    const { data } = supabase.storage.from('holiday-images').getPublicUrl(fileName);
+    return data.publicUrl;
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImageUrl('');
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,25 +92,57 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
 
     setLoading(true);
     try {
+      let finalImageUrl = imageUrl;
+
+      if (imageFile) {
+        setUploading(true);
+        const uploadedUrl = await uploadImage(imageFile);
+        setUploading(false);
+        if (uploadedUrl) {
+          finalImageUrl = uploadedUrl;
+        }
+      }
+
       await onSave({
         title,
         date: format(date, 'yyyy-MM-dd'),
         message: message || undefined,
-        image_url: imageUrl || undefined,
+        image_url: finalImageUrl || undefined,
       });
       onOpenChange(false);
-      setTitle('');
-      setDate(undefined);
-      setMessage('');
-      setImageUrl('');
+      resetForm();
     } finally {
       setLoading(false);
     }
   };
 
+  const resetForm = () => {
+    setTitle('');
+    setDate(undefined);
+    setMessage('');
+    setImageUrl('');
+    setImageFile(null);
+    setImagePreview(null);
+  };
+
+  // Reset form when modal opens with different holiday
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen && holiday) {
+      setTitle(holiday.title);
+      setDate(new Date(holiday.date));
+      setMessage(holiday.message || '');
+      setImageUrl(holiday.image_url || '');
+      setImagePreview(holiday.image_url || null);
+      setImageFile(null);
+    } else if (!isOpen) {
+      resetForm();
+    }
+    onOpenChange(isOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{holiday ? 'Edit Holiday' : 'Add Holiday'}</DialogTitle>
         </DialogHeader>
@@ -102,21 +188,68 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="imageUrl">Image URL</Label>
+            <Label>Image</Label>
+            
+            {imagePreview ? (
+              <div className="relative rounded-lg overflow-hidden border border-border">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-full h-40 object-cover"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8"
+                  onClick={clearImage}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground mb-1">Click to upload an image</p>
+                <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 5MB</p>
+              </div>
+            )}
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs text-muted-foreground">or</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
             <Input
-              id="imageUrl"
               value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://example.com/image.jpg"
+              onChange={(e) => {
+                setImageUrl(e.target.value);
+                setImageFile(null);
+                setImagePreview(e.target.value || null);
+              }}
+              placeholder="Paste image URL"
+              disabled={!!imageFile}
             />
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={loading || !title || !date}>
-              {loading ? 'Saving...' : holiday ? 'Update' : 'Add'}
+              {uploading ? 'Uploading...' : loading ? 'Saving...' : holiday ? 'Update' : 'Add'}
             </Button>
           </div>
         </form>
