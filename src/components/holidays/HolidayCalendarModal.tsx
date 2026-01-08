@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, CalendarDays, ImageIcon, Upload, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { Plus, Edit, Trash2, CalendarDays, Download, ImageIcon, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -24,7 +23,8 @@ import {
 interface Holiday {
   id: string;
   title: string;
-  date: string;
+  start_date: string;
+  end_date: string;
   message?: string;
   image_url?: string;
   created_by: string;
@@ -39,18 +39,14 @@ interface HolidayCalendarModalProps {
 export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCalendarModalProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [formOpen, setFormOpen] = useState(false);
   const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingHoliday, setDeletingHoliday] = useState<Holiday | null>(null);
-  const [overviewImageUrl, setOverviewImageUrl] = useState<string | null>(null);
-  const [uploadingOverview, setUploadingOverview] = useState(false);
-  const [showOverviewImage, setShowOverviewImage] = useState(false);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.25, 3));
@@ -62,7 +58,7 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
     const { data, error } = await supabase
       .from('holidays')
       .select('*')
-      .order('date', { ascending: true });
+      .order('start_date', { ascending: true });
 
     if (error) {
       toast.error('Failed to load holidays');
@@ -72,93 +68,13 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
     setLoading(false);
   };
 
-  const fetchOverviewImage = async () => {
-    const { data } = await supabase
-      .from('holiday_settings')
-      .select('overview_image_url')
-      .eq('id', '00000000-0000-0000-0000-000000000001')
-      .single();
-    
-    if (data?.overview_image_url) {
-      setOverviewImageUrl(data.overview_image_url);
-    }
-  };
-
-  const handleOverviewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
-      return;
-    }
-
-    setUploadingOverview(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `overview-${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('holiday-images')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('holiday-images')
-        .getPublicUrl(fileName);
-
-      const publicUrl = urlData.publicUrl;
-
-      const { error: updateError } = await supabase
-        .from('holiday_settings')
-        .update({ 
-          overview_image_url: publicUrl,
-          updated_at: new Date().toISOString(),
-          updated_by: user?.name || 'Admin'
-        })
-        .eq('id', '00000000-0000-0000-0000-000000000001');
-
-      if (updateError) throw updateError;
-
-      setOverviewImageUrl(publicUrl);
-      toast.success('Holidays overview image uploaded');
-    } catch (error) {
-      toast.error('Failed to upload image');
-    } finally {
-      setUploadingOverview(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleRemoveOverviewImage = async () => {
-    try {
-      const { error } = await supabase
-        .from('holiday_settings')
-        .update({ 
-          overview_image_url: null,
-          updated_at: new Date().toISOString(),
-          updated_by: user?.name || 'Admin'
-        })
-        .eq('id', '00000000-0000-0000-0000-000000000001');
-
-      if (error) throw error;
-
-      setOverviewImageUrl(null);
-      toast.success('Overview image removed');
-    } catch (error) {
-      toast.error('Failed to remove image');
-    }
-  };
-
   useEffect(() => {
     if (open) {
       fetchHolidays();
-      fetchOverviewImage();
     }
   }, [open]);
 
-  const handleSave = async (data: { title: string; date: string; message?: string; image_url?: string }) => {
+  const handleSave = async (data: { title: string; start_date: string; end_date: string; message?: string; image_url?: string }) => {
     if (editingHoliday) {
       const { error } = await supabase
         .from('holidays')
@@ -202,146 +118,112 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
     setDeleteConfirmOpen(false);
   };
 
-  const holidayDates = holidays.map((h) => parseISO(h.date));
-  const selectedDateHolidays = holidays.filter((h) => selectedDate && isSameDay(parseISO(h.date), selectedDate));
+  const handleDownloadImage = async (imageUrl: string, title: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title.replace(/\s+/g, '-').toLowerCase()}-holiday.${blob.type.split('/')[1] || 'jpg'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success('Image downloaded');
+    } catch {
+      toast.error('Failed to download image');
+    }
+  };
+
+  const formatDateRange = (startDate: string, endDate: string) => {
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
+    if (startDate === endDate) {
+      return format(start, 'MMM dd, yyyy');
+    }
+    return `${format(start, 'MMM dd')} - ${format(end, 'MMM dd, yyyy')}`;
+  };
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="pr-8 shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-primary" />
-              Holiday Calendar
-            </DialogTitle>
-          </DialogHeader>
-
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-4 pb-4">
-              {/* View All Holidays Button - shown for all when image exists */}
-              {overviewImageUrl && (
-                <div className="flex justify-end">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setShowOverviewImage(true)}
-                    className="flex items-center gap-2"
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                    View All Holidays
-                  </Button>
-                </div>
-              )}
-
-              {/* Admin Overview Image Upload Section */}
+            <div className="flex items-center justify-between gap-4">
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-primary" />
+                Holiday Calendar
+              </DialogTitle>
               {isAdmin && (
-                <div className="border rounded-lg p-4 bg-muted/30">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <h4 className="font-medium text-sm">Holidays Overview Image</h4>
-                      <p className="text-xs text-muted-foreground">Upload a single image showing all holidays (visible to managers & staff)</p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {overviewImageUrl && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={handleRemoveOverviewImage}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          Remove
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploadingOverview}
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        {uploadingOverview ? 'Uploading...' : overviewImageUrl ? 'Replace' : 'Upload'}
-                      </Button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleOverviewImageUpload}
-                        className="hidden"
-                      />
-                    </div>
-                  </div>
-                  {overviewImageUrl && (
-                    <div className="mt-3">
-                      <img 
-                        src={overviewImageUrl} 
-                        alt="Holidays Overview" 
-                        className="max-h-32 rounded-md object-contain border"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="grid md:grid-cols-2 gap-6">
-            {/* Calendar Section */}
-            <div className="flex flex-col items-center">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                modifiers={{ holiday: holidayDates }}
-                modifiersStyles={{
-                  holiday: {
-                    backgroundColor: 'hsl(var(--primary) / 0.2)',
-                    color: 'hsl(var(--primary))',
-                    fontWeight: 'bold',
-                  },
-                }}
-                className="rounded-md border"
-              />
-              {isAdmin && (
-                <Button onClick={() => setFormOpen(true)} className="mt-4 w-full max-w-xs">
+                <Button onClick={() => setFormOpen(true)} size="sm" className="shrink-0">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Holiday
                 </Button>
               )}
             </div>
+          </DialogHeader>
 
-            {/* Holiday Details Section */}
-            <div className="flex flex-col">
-              <h3 className="font-semibold mb-3">
-                {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : 'Select a date'}
-              </h3>
-              <ScrollArea className="flex-1 max-h-[400px]">
-                {loading ? (
-                  <p className="text-muted-foreground text-sm">Loading...</p>
-                ) : selectedDateHolidays.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No holidays on this date</p>
-                ) : (
-                  <div className="space-y-3">
-                    {selectedDateHolidays.map((holiday) => (
-                      <Card key={holiday.id} className="overflow-hidden">
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-4 pb-4">
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              ) : holidays.length === 0 ? (
+                <div className="text-center py-12">
+                  <CalendarDays className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No holidays added yet</p>
+                </div>
+              ) : (
+                holidays.map((holiday, index) => (
+                  <Card 
+                    key={holiday.id} 
+                    className="overflow-hidden animate-slide-up"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <CardContent className="p-0">
+                      <div className="flex flex-col sm:flex-row">
+                        {/* Image Section */}
                         {holiday.image_url && (
-                          <div className="relative h-32 bg-muted">
+                          <div className="relative sm:w-40 h-32 sm:h-auto shrink-0 bg-muted">
                             <img
                               src={holiday.image_url}
                               alt={holiday.title}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover cursor-pointer"
+                              onClick={() => setViewingImage(holiday.image_url!)}
                               onError={(e) => {
                                 (e.target as HTMLImageElement).style.display = 'none';
                               }}
                             />
+                            {/* Download button overlay */}
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="absolute bottom-2 right-2 h-8 w-8 opacity-90"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadImage(holiday.image_url!, holiday.title);
+                              }}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
                           </div>
                         )}
-                        <CardContent className="p-4">
+
+                        {/* Content Section */}
+                        <div className="flex-1 p-4">
                           <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-lg">{holiday.title}</h4>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-lg">{holiday.title}</h3>
+                              <div className="flex items-center gap-2 text-sm text-primary mt-1">
+                                <CalendarDays className="h-4 w-4" />
+                                {formatDateRange(holiday.start_date, holiday.end_date)}
+                              </div>
                               {holiday.message && (
-                                <p className="text-sm text-muted-foreground mt-1">{holiday.message}</p>
+                                <p className="text-sm text-muted-foreground mt-2">{holiday.message}</p>
                               )}
                             </div>
+
+                            {/* Admin Actions */}
                             {isAdmin && (
                               <div className="flex gap-1 shrink-0">
                                 <Button
@@ -368,36 +250,34 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
                               </div>
                             )}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
 
-              {/* All Holidays List */}
-              <div className="mt-4 pt-4 border-t">
-                <h4 className="font-medium text-sm mb-2">All Holidays</h4>
-                <ScrollArea className="max-h-[150px]">
-                  <div className="space-y-2">
-                    {holidays.map((holiday) => (
-                      <div
-                        key={holiday.id}
-                        className="flex items-center justify-between p-2 rounded-md bg-muted/50 text-sm cursor-pointer hover:bg-muted"
-                        onClick={() => setSelectedDate(parseISO(holiday.date))}
-                      >
-                        <span className="font-medium">{holiday.title}</span>
-                        <span className="text-muted-foreground">{format(parseISO(holiday.date), 'MMM d, yyyy')}</span>
+                          {/* View/Download for non-image cards */}
+                          {holiday.image_url && (
+                            <div className="flex items-center gap-2 mt-3 sm:hidden">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setViewingImage(holiday.image_url!)}
+                              >
+                                <ImageIcon className="h-4 w-4 mr-2" />
+                                View Image
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadImage(holiday.image_url!, holiday.title)}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                    {holidays.length === 0 && !loading && (
-                      <p className="text-muted-foreground text-sm">No holidays added yet</p>
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
-            </div>
-          </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </ScrollArea>
         </DialogContent>
@@ -430,23 +310,33 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Full-screen Overview Image Dialog */}
+      {/* Full-screen Image Viewer */}
       <Dialog
-        open={showOverviewImage}
+        open={!!viewingImage}
         onOpenChange={(open) => {
-          setShowOverviewImage(open);
-          if (!open) setZoomLevel(1);
+          if (!open) {
+            setViewingImage(null);
+            setZoomLevel(1);
+          }
         }}
       >
         <DialogContent className="max-w-6xl h-[95vh] p-0 overflow-hidden">
           <div className="flex h-full flex-col min-h-0">
             <div className="border-b p-4 pr-12 flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 font-semibold">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                <span>All Holidays</span>
+                <ImageIcon className="h-5 w-5 text-primary" />
+                <span>Holiday Image</span>
               </div>
 
               <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => viewingImage && handleDownloadImage(viewingImage, 'holiday')}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
                 <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={zoomLevel <= 0.5}>
                   <ZoomOut className="h-4 w-4" />
                 </Button>
@@ -460,17 +350,14 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
               </div>
             </div>
 
-            {overviewImageUrl && (
-              <div className="flex-1 min-h-0 overflow-auto bg-muted/20 p-4">
-                <div className="min-w-full flex justify-center">
-                  <img
-                    src={overviewImageUrl}
-                    alt="All Holidays"
-                    className="max-w-none h-auto rounded-lg border bg-background transition-[width] duration-200"
-                    style={{ width: `${zoomLevel * 100}%` }}
-                    loading="lazy"
-                  />
-                </div>
+            {viewingImage && (
+              <div className="flex-1 min-h-0 overflow-auto p-4">
+                <img
+                  src={viewingImage}
+                  alt="Holiday"
+                  className="mx-auto"
+                  style={{ width: `${zoomLevel * 100}%` }}
+                />
               </div>
             )}
           </div>

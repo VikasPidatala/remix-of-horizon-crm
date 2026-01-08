@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { CalendarIcon, X, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +15,8 @@ import { toast } from 'sonner';
 interface Holiday {
   id: string;
   title: string;
-  date: string;
+  start_date: string;
+  end_date: string;
   message?: string;
   image_url?: string;
 }
@@ -24,12 +25,13 @@ interface HolidayFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   holiday?: Holiday | null;
-  onSave: (data: { title: string; date: string; message?: string; image_url?: string }) => Promise<void>;
+  onSave: (data: { title: string; start_date: string; end_date: string; message?: string; image_url?: string }) => Promise<void>;
 }
 
 export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }: HolidayFormModalProps) {
   const [title, setTitle] = useState(holiday?.title || '');
-  const [date, setDate] = useState<Date | undefined>(holiday?.date ? new Date(holiday.date) : undefined);
+  const [startDate, setStartDate] = useState<Date | undefined>(holiday?.start_date ? new Date(holiday.start_date) : undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(holiday?.end_date ? new Date(holiday.end_date) : undefined);
   const [message, setMessage] = useState(holiday?.message || '');
   const [imageUrl, setImageUrl] = useState(holiday?.image_url || '');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -89,6 +91,26 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!title.trim()) {
+      toast.error('Title is required');
+      return;
+    }
+
+    if (!startDate) {
+      toast.error('Start date is required');
+      return;
+    }
+
+    if (!endDate) {
+      toast.error('End date is required');
+      return;
+    }
+
+    if (endDate < startDate) {
+      toast.error('End date must be after start date');
+      return;
+    }
+
     setLoading(true);
     try {
       let finalImageUrl = imageUrl;
@@ -104,7 +126,8 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
 
       await onSave({
         title,
-        date: format(date, 'yyyy-MM-dd'),
+        start_date: format(startDate, 'yyyy-MM-dd'),
+        end_date: format(endDate, 'yyyy-MM-dd'),
         message: message || undefined,
         image_url: finalImageUrl || undefined,
       });
@@ -117,18 +140,19 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
 
   const resetForm = () => {
     setTitle('');
-    setDate(undefined);
+    setStartDate(undefined);
+    setEndDate(undefined);
     setMessage('');
     setImageUrl('');
     setImageFile(null);
     setImagePreview(null);
   };
 
-  // Reset form when modal opens with different holiday
   const handleOpenChange = (isOpen: boolean) => {
     if (isOpen && holiday) {
       setTitle(holiday.title);
-      setDate(new Date(holiday.date));
+      setStartDate(new Date(holiday.start_date));
+      setEndDate(new Date(holiday.end_date));
       setMessage(holiday.message || '');
       setImageUrl(holiday.image_url || '');
       setImagePreview(holiday.image_url || null);
@@ -147,35 +171,62 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">Title *</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Holiday name"
+              required
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn('w-full justify-start text-left font-normal', !date && 'text-muted-foreground')}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, 'PPP') : 'Pick a date'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
-              </PopoverContent>
-            </Popover>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Start Date *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn('w-full justify-start text-left font-normal', !startDate && 'text-muted-foreground')}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, 'MMM dd, yyyy') : 'Start'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>End Date *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn('w-full justify-start text-left font-normal', !endDate && 'text-muted-foreground')}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {endDate ? format(endDate, 'MMM dd, yyyy') : 'End'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar 
+                    mode="single" 
+                    selected={endDate} 
+                    onSelect={setEndDate} 
+                    initialFocus 
+                    disabled={(date) => startDate ? date < startDate : false}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="message">Message</Label>
+            <Label htmlFor="message">Message/Reason</Label>
             <Textarea
               id="message"
               value={message}
