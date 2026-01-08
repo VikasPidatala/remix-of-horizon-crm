@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, CalendarDays, Download, ImageIcon, ZoomIn, ZoomOut, RotateCcw, Sparkles } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit, Trash2, CalendarDays, Download, ImageIcon, ZoomIn, ZoomOut, RotateCcw, Sparkles, Search, ArrowUpDown } from 'lucide-react';
 import { format, parseISO, isBefore, startOfDay, isWithinInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,6 +53,8 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'date-asc' | 'date-desc' | 'title-asc' | 'title-desc'>('date-asc');
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.25, 3));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
@@ -159,17 +163,43 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
   const upcomingHolidays = holidays.filter((h) => !isBefore(parseISO(h.end_date), today));
   const pastHolidays = holidays.filter((h) => isBefore(parseISO(h.end_date), today));
 
-  const filteredHolidays = holidays.filter((holiday) => {
-    const endDate = parseISO(holiday.end_date);
-    
-    if (filter === 'upcoming') {
-      return !isBefore(endDate, today);
+  const filteredAndSortedHolidays = useMemo(() => {
+    // Filter by tab
+    let result = holidays.filter((holiday) => {
+      const endDate = parseISO(holiday.end_date);
+      if (filter === 'upcoming') return !isBefore(endDate, today);
+      if (filter === 'past') return isBefore(endDate, today);
+      return true;
+    });
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (h) =>
+          h.title.toLowerCase().includes(query) ||
+          (h.message && h.message.toLowerCase().includes(query))
+      );
     }
-    if (filter === 'past') {
-      return isBefore(endDate, today);
-    }
-    return true;
-  });
+
+    // Sort
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'date-asc':
+          return parseISO(a.start_date).getTime() - parseISO(b.start_date).getTime();
+        case 'date-desc':
+          return parseISO(b.start_date).getTime() - parseISO(a.start_date).getTime();
+        case 'title-asc':
+          return a.title.localeCompare(b.title);
+        case 'title-desc':
+          return b.title.localeCompare(a.title);
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [holidays, filter, searchQuery, sortBy, today]);
 
   return (
     <>
@@ -214,19 +244,48 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
             </TabsList>
           </Tabs>
 
+          {/* Search and Sort */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search holidays..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+              <SelectTrigger className="w-[160px]">
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date-asc">Date (Oldest)</SelectItem>
+                <SelectItem value="date-desc">Date (Newest)</SelectItem>
+                <SelectItem value="title-asc">Title (A-Z)</SelectItem>
+                <SelectItem value="title-desc">Title (Z-A)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <ScrollArea className="flex-1 -mx-6 px-6">
             <div className="space-y-4 pb-4">
               {loading ? (
                 <div className="text-center py-8 text-muted-foreground">Loading...</div>
-              ) : filteredHolidays.length === 0 ? (
+              ) : filteredAndSortedHolidays.length === 0 ? (
                 <div className="text-center py-12">
                   <CalendarDays className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    {holidays.length === 0 ? 'No holidays added yet' : `No ${filter} holidays`}
+                    {holidays.length === 0 
+                      ? 'No holidays added yet' 
+                      : searchQuery 
+                        ? 'No holidays match your search' 
+                        : `No ${filter} holidays`}
                   </p>
                 </div>
               ) : (
-                filteredHolidays.map((holiday, index) => {
+                filteredAndSortedHolidays.map((holiday, index) => {
                   const isTodayHoliday = isHolidayToday(holiday);
                   return (
                   <Card 
