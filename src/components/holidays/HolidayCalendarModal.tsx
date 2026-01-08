@@ -208,80 +208,82 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-          <DialogHeader className="pr-8">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="pr-8 shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-primary" />
               Holiday Calendar
             </DialogTitle>
           </DialogHeader>
 
-          {/* View All Holidays Button - shown for all when image exists */}
-          {overviewImageUrl && (
-            <div className="flex justify-end -mt-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setShowOverviewImage(true)}
-                className="flex items-center gap-2"
-              >
-                <ImageIcon className="h-4 w-4" />
-                View All Holidays
-              </Button>
-            </div>
-          )}
-
-          {/* Admin Overview Image Upload Section */}
-          {isAdmin && (
-            <div className="border rounded-lg p-4 bg-muted/30">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h4 className="font-medium text-sm">Holidays Overview Image</h4>
-                  <p className="text-xs text-muted-foreground">Upload a single image showing all holidays (visible to managers & staff)</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {overviewImageUrl && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={handleRemoveOverviewImage}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Remove
-                    </Button>
-                  )}
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-4 pb-4">
+              {/* View All Holidays Button - shown for all when image exists */}
+              {overviewImageUrl && (
+                <div className="flex justify-end">
                   <Button 
                     variant="outline" 
-                    size="sm" 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingOverview}
+                    size="sm"
+                    onClick={() => setShowOverviewImage(true)}
+                    className="flex items-center gap-2"
                   >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploadingOverview ? 'Uploading...' : overviewImageUrl ? 'Replace' : 'Upload'}
+                    <ImageIcon className="h-4 w-4" />
+                    View All Holidays
                   </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleOverviewImageUpload}
-                    className="hidden"
-                  />
-                </div>
-              </div>
-              {overviewImageUrl && (
-                <div className="mt-3">
-                  <img 
-                    src={overviewImageUrl} 
-                    alt="Holidays Overview" 
-                    className="max-h-32 rounded-md object-contain border"
-                  />
                 </div>
               )}
-            </div>
-          )}
 
-          <div className="grid md:grid-cols-2 gap-6">
+              {/* Admin Overview Image Upload Section */}
+              {isAdmin && (
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="font-medium text-sm">Holidays Overview Image</h4>
+                      <p className="text-xs text-muted-foreground">Upload a single image showing all holidays (visible to managers & staff)</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {overviewImageUrl && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={handleRemoveOverviewImage}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Remove
+                        </Button>
+                      )}
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingOverview}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {uploadingOverview ? 'Uploading...' : overviewImageUrl ? 'Replace' : 'Upload'}
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleOverviewImageUpload}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+                  {overviewImageUrl && (
+                    <div className="mt-3">
+                      <img 
+                        src={overviewImageUrl} 
+                        alt="Holidays Overview" 
+                        className="max-h-32 rounded-md object-contain border"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid md:grid-cols-2 gap-6">
             {/* Calendar Section */}
             <div className="flex flex-col items-center">
               <Calendar
@@ -396,6 +398,8 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
               </div>
             </div>
           </div>
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
