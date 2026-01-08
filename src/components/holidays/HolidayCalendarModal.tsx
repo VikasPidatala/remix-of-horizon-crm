@@ -3,8 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Edit, Trash2, CalendarDays, Download, ImageIcon, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -48,6 +49,7 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
   const [deletingHoliday, setDeletingHoliday] = useState<Holiday | null>(null);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.25, 3));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
@@ -145,6 +147,23 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
     return `${format(start, 'MMM dd')} - ${format(end, 'MMM dd, yyyy')}`;
   };
 
+  const today = startOfDay(new Date());
+
+  const filteredHolidays = holidays.filter((holiday) => {
+    const endDate = parseISO(holiday.end_date);
+    const startDate = parseISO(holiday.start_date);
+    
+    if (filter === 'upcoming') {
+      // Upcoming: end_date is today or in the future
+      return !isBefore(endDate, today);
+    }
+    if (filter === 'past') {
+      // Past: end_date is before today
+      return isBefore(endDate, today);
+    }
+    return true; // 'all'
+  });
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -164,17 +183,28 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
             </div>
           </DialogHeader>
 
+          {/* Filter Tabs */}
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as 'all' | 'upcoming' | 'past')} className="shrink-0">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+              <TabsTrigger value="past">Past</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <ScrollArea className="flex-1 -mx-6 px-6">
             <div className="space-y-4 pb-4">
               {loading ? (
                 <div className="text-center py-8 text-muted-foreground">Loading...</div>
-              ) : holidays.length === 0 ? (
+              ) : filteredHolidays.length === 0 ? (
                 <div className="text-center py-12">
                   <CalendarDays className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No holidays added yet</p>
+                  <p className="text-muted-foreground">
+                    {holidays.length === 0 ? 'No holidays added yet' : `No ${filter} holidays`}
+                  </p>
                 </div>
               ) : (
-                holidays.map((holiday, index) => (
+                filteredHolidays.map((holiday, index) => (
                   <Card 
                     key={holiday.id} 
                     className="overflow-hidden animate-slide-up"
