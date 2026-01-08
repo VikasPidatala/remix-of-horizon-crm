@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, CalendarDays, ImageIcon, Upload, X } from 'lucide-react';
+import { Plus, Edit, Trash2, CalendarDays, ImageIcon, Upload, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { format, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,6 +51,11 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
   const [overviewImageUrl, setOverviewImageUrl] = useState<string | null>(null);
   const [uploadingOverview, setUploadingOverview] = useState(false);
   const [showOverviewImage, setShowOverviewImage] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
+  const handleResetZoom = () => setZoomLevel(1);
 
   const fetchHolidays = async () => {
     setLoading(true);
@@ -420,20 +425,38 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
       </AlertDialog>
 
       {/* Full-screen Overview Image Dialog */}
-      <Dialog open={showOverviewImage} onOpenChange={setShowOverviewImage}>
+      <Dialog open={showOverviewImage} onOpenChange={(open) => {
+        setShowOverviewImage(open);
+        if (!open) setZoomLevel(1);
+      }}>
         <DialogContent className="max-w-5xl max-h-[95vh] p-2">
           <DialogHeader className="pb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-primary" />
-              All Holidays
+            <DialogTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-primary" />
+                All Holidays
+              </span>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={zoomLevel <= 0.5}>
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <span className="text-sm w-14 text-center">{Math.round(zoomLevel * 100)}%</span>
+                <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={zoomLevel >= 3}>
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handleResetZoom}>
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
             </DialogTitle>
           </DialogHeader>
           {overviewImageUrl && (
-            <div className="flex items-center justify-center overflow-auto max-h-[80vh]">
+            <div className="flex items-center justify-center overflow-auto max-h-[80vh] bg-muted/30 rounded-lg p-4">
               <img 
                 src={overviewImageUrl} 
                 alt="All Holidays" 
-                className="max-w-full max-h-full object-contain rounded-lg"
+                className="object-contain rounded-lg transition-transform duration-200"
+                style={{ transform: `scale(${zoomLevel})` }}
               />
             </div>
           )}
