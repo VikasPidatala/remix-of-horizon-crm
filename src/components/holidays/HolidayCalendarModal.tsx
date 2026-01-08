@@ -425,17 +425,21 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
       </AlertDialog>
 
       {/* Full-screen Overview Image Dialog */}
-      <Dialog open={showOverviewImage} onOpenChange={(open) => {
-        setShowOverviewImage(open);
-        if (!open) setZoomLevel(1);
-      }}>
-        <DialogContent className="max-w-5xl max-h-[95vh] p-2">
-          <DialogHeader className="pb-2">
-            <DialogTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
+      <Dialog
+        open={showOverviewImage}
+        onOpenChange={(open) => {
+          setShowOverviewImage(open);
+          if (!open) setZoomLevel(1);
+        }}
+      >
+        <DialogContent className="max-w-6xl h-[95vh] p-0 overflow-hidden">
+          <div className="flex h-full flex-col min-h-0">
+            <div className="border-b p-4 pr-12 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 font-semibold">
                 <CalendarDays className="h-5 w-5 text-primary" />
-                All Holidays
-              </span>
+                <span>All Holidays</span>
+              </div>
+
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={zoomLevel <= 0.5}>
                   <ZoomOut className="h-4 w-4" />
@@ -448,18 +452,22 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
                   <RotateCcw className="h-4 w-4" />
                 </Button>
               </div>
-            </DialogTitle>
-          </DialogHeader>
-          {overviewImageUrl && (
-            <div className="flex items-center justify-center overflow-auto max-h-[80vh] bg-muted/30 rounded-lg p-4">
-              <img 
-                src={overviewImageUrl} 
-                alt="All Holidays" 
-                className="object-contain rounded-lg transition-transform duration-200"
-                style={{ transform: `scale(${zoomLevel})` }}
-              />
             </div>
-          )}
+
+            {overviewImageUrl && (
+              <div className="flex-1 min-h-0 overflow-auto bg-muted/20 p-4">
+                <div className="min-w-full flex justify-center">
+                  <img
+                    src={overviewImageUrl}
+                    alt="All Holidays"
+                    className="max-w-none h-auto rounded-lg border bg-background transition-[width] duration-200"
+                    style={{ width: `${zoomLevel * 100}%` }}
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>
