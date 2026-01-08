@@ -6,9 +6,11 @@ import TaskStatusChart from '@/components/dashboard/TaskStatusChart';
 import LeadStatusChart from '@/components/dashboard/LeadStatusChart';
 import RemindersWidget from '@/components/dashboard/RemindersWidget';
 import CalendarView from '@/components/dashboard/CalendarView';
+import HolidayCalendarModal from '@/components/holidays/HolidayCalendarModal';
+import { Button } from '@/components/ui/button';
 import { useData } from '@/contexts/DataContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Building, ClipboardList, CheckSquare, CalendarOff } from 'lucide-react';
+import { Building, ClipboardList, CheckSquare, CalendarOff, CalendarDays } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface StaffMember {
@@ -21,6 +23,7 @@ export default function ManagerDashboard() {
   const { leads, tasks, projects, announcements } = useData();
   const [pendingLeaves, setPendingLeaves] = useState(0);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,7 +69,12 @@ export default function ManagerDashboard() {
 
   return (
     <div className="min-h-screen">
-      <TopBar title="Manager Dashboard" subtitle="Monitor your team's performance" />
+      <TopBar title="Manager Dashboard" subtitle="Monitor your team's performance">
+        <Button onClick={() => setHolidayModalOpen(true)} variant="outline" className="gap-2">
+          <CalendarDays className="h-4 w-4" />
+          <span className="hidden sm:inline">Holiday Calendar</span>
+        </Button>
+      </TopBar>
       
       <div className="p-6 space-y-6">
         {/* Announcements */}
@@ -194,6 +202,8 @@ export default function ManagerDashboard() {
         {/* Calendar View */}
         <CalendarView leads={leads} tasks={tasks} title="Team Calendar" />
       </div>
+
+      <HolidayCalendarModal open={holidayModalOpen} onOpenChange={setHolidayModalOpen} />
     </div>
   );
 }
