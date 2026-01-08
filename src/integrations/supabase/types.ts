@@ -125,6 +125,27 @@ export type Database = {
         }
         Relationships: []
       }
+      holiday_settings: {
+        Row: {
+          id: string
+          overview_image_url: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          overview_image_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          overview_image_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       holidays: {
         Row: {
           created_at: string
