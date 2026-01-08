@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,16 +29,38 @@ interface HolidayFormModalProps {
 }
 
 export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }: HolidayFormModalProps) {
-  const [title, setTitle] = useState(holiday?.title || '');
-  const [startDate, setStartDate] = useState<Date | undefined>(holiday?.start_date ? new Date(holiday.start_date) : undefined);
-  const [endDate, setEndDate] = useState<Date | undefined>(holiday?.end_date ? new Date(holiday.end_date) : undefined);
-  const [message, setMessage] = useState(holiday?.message || '');
-  const [imageUrl, setImageUrl] = useState(holiday?.image_url || '');
+  const [title, setTitle] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [message, setMessage] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(holiday?.image_url || null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync form state with holiday prop when modal opens
+  useEffect(() => {
+    if (open && holiday) {
+      setTitle(holiday.title);
+      setStartDate(new Date(holiday.start_date));
+      setEndDate(new Date(holiday.end_date));
+      setMessage(holiday.message || '');
+      setImageUrl(holiday.image_url || '');
+      setImagePreview(holiday.image_url || null);
+      setImageFile(null);
+    } else if (open && !holiday) {
+      // Reset for new holiday
+      setTitle('');
+      setStartDate(undefined);
+      setEndDate(undefined);
+      setMessage('');
+      setImageUrl('');
+      setImagePreview(null);
+      setImageFile(null);
+    }
+  }, [open, holiday]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -149,15 +171,7 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
   };
 
   const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen && holiday) {
-      setTitle(holiday.title);
-      setStartDate(new Date(holiday.start_date));
-      setEndDate(new Date(holiday.end_date));
-      setMessage(holiday.message || '');
-      setImageUrl(holiday.image_url || '');
-      setImagePreview(holiday.image_url || null);
-      setImageFile(null);
-    } else if (!isOpen) {
+    if (!isOpen) {
       resetForm();
     }
     onOpenChange(isOpen);
