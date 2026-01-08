@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, CalendarDays, ImageIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, CalendarDays, ImageIcon, Upload, X } from 'lucide-react';
 import { format, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +39,7 @@ interface HolidayCalendarModalProps {
 export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCalendarModalProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +48,9 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
   const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingHoliday, setDeletingHoliday] = useState<Holiday | null>(null);
+  const [overviewImageUrl, setOverviewImageUrl] = useState<string | null>(null);
+  const [uploadingOverview, setUploadingOverview] = useState(false);
+  const [showOverviewImage, setShowOverviewImage] = useState(false);
 
   const fetchHolidays = async () => {
     setLoading(true);
@@ -63,9 +67,89 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
     setLoading(false);
   };
 
+  const fetchOverviewImage = async () => {
+    const { data } = await supabase
+      .from('holiday_settings')
+      .select('overview_image_url')
+      .eq('id', '00000000-0000-0000-0000-000000000001')
+      .single();
+    
+    if (data?.overview_image_url) {
+      setOverviewImageUrl(data.overview_image_url);
+    }
+  };
+
+  const handleOverviewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setUploadingOverview(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `overview-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('holiday-images')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('holiday-images')
+        .getPublicUrl(fileName);
+
+      const publicUrl = urlData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from('holiday_settings')
+        .update({ 
+          overview_image_url: publicUrl,
+          updated_at: new Date().toISOString(),
+          updated_by: user?.name || 'Admin'
+        })
+        .eq('id', '00000000-0000-0000-0000-000000000001');
+
+      if (updateError) throw updateError;
+
+      setOverviewImageUrl(publicUrl);
+      toast.success('Holidays overview image uploaded');
+    } catch (error) {
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingOverview(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveOverviewImage = async () => {
+    try {
+      const { error } = await supabase
+        .from('holiday_settings')
+        .update({ 
+          overview_image_url: null,
+          updated_at: new Date().toISOString(),
+          updated_by: user?.name || 'Admin'
+        })
+        .eq('id', '00000000-0000-0000-0000-000000000001');
+
+      if (error) throw error;
+
+      setOverviewImageUrl(null);
+      toast.success('Overview image removed');
+    } catch (error) {
+      toast.error('Failed to remove image');
+    }
+  };
+
   useEffect(() => {
     if (open) {
       fetchHolidays();
+      fetchOverviewImage();
     }
   }, [open]);
 
@@ -121,11 +205,74 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-primary" />
-              Holiday Calendar
+            <DialogTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-primary" />
+                Holiday Calendar
+              </span>
+              {overviewImageUrl && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowOverviewImage(true)}
+                  className="flex items-center gap-2"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  View All Holidays
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
+
+          {/* Admin Overview Image Upload Section */}
+          {isAdmin && (
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-sm">Holidays Overview Image</h4>
+                  <p className="text-xs text-muted-foreground">Upload a single image showing all holidays (visible to managers & staff)</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {overviewImageUrl && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={handleRemoveOverviewImage}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Remove
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingOverview}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {uploadingOverview ? 'Uploading...' : overviewImageUrl ? 'Replace' : 'Upload'}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleOverviewImageUpload}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+              {overviewImageUrl && (
+                <div className="mt-3">
+                  <img 
+                    src={overviewImageUrl} 
+                    alt="Holidays Overview" 
+                    className="max-h-32 rounded-md object-contain border"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* Calendar Section */}
@@ -271,6 +418,27 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Full-screen Overview Image Dialog */}
+      <Dialog open={showOverviewImage} onOpenChange={setShowOverviewImage}>
+        <DialogContent className="max-w-5xl max-h-[95vh] p-2">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              All Holidays
+            </DialogTitle>
+          </DialogHeader>
+          {overviewImageUrl && (
+            <div className="flex items-center justify-center overflow-auto max-h-[80vh]">
+              <img 
+                src={overviewImageUrl} 
+                alt="All Holidays" 
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
