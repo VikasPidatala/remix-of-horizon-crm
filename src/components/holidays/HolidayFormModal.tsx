@@ -88,7 +88,6 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !date) return;
 
     setLoading(true);
     try {
@@ -148,18 +147,17 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
+            <Label htmlFor="title">Title</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Holiday name"
-              required
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Date *</Label>
+            <Label>Date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -248,7 +246,7 @@ export default function HolidayFormModal({ open, onOpenChange, holiday, onSave }
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !title || !date}>
+            <Button type="submit" disabled={loading}>
               {uploading ? 'Uploading...' : loading ? 'Saving...' : holiday ? 'Update' : 'Add'}
             </Button>
           </div>
