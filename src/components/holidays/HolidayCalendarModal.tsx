@@ -405,14 +405,14 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
           }
         }}
       >
-        <DialogContent className="max-w-[95vw] sm:max-w-4xl h-[90vh] sm:h-[85vh] p-0 overflow-hidden">
+        <DialogContent className="max-w-[95vw] sm:max-w-4xl h-[90vh] sm:h-[85vh] p-0 overflow-hidden [&>button]:hidden">
           <div className="flex h-full flex-col min-h-0">
             {/* Header with controls */}
-            <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-background shrink-0">
-              <h3 className="font-semibold text-sm sm:text-base truncate flex-1 mr-2">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-background shrink-0 gap-2">
+              <h3 className="font-semibold text-sm sm:text-base truncate flex-1 min-w-0">
                 {viewingImage?.title}
               </h3>
-              <div className="flex items-center gap-1 sm:gap-2">
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                 <Button
                   variant="outline"
                   size="icon"
@@ -422,7 +422,7 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
                 >
                   <ZoomOut className="h-4 w-4" />
                 </Button>
-                <span className="text-xs sm:text-sm font-medium w-12 text-center">
+                <span className="text-xs sm:text-sm font-medium w-10 sm:w-12 text-center">
                   {Math.round(zoomLevel * 100)}%
                 </span>
                 <Button
@@ -449,6 +449,17 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
                   onClick={() => viewingImage && handleDownloadImage(viewingImage.url, viewingImage.title)}
                 >
                   <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    setViewingImage(null);
+                    setZoomLevel(1);
+                  }}
+                >
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
