@@ -1,14 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, CalendarDays, Download, ImageIcon, ZoomIn, ZoomOut, RotateCcw, Sparkles, Search, ArrowUpDown } from 'lucide-react';
-import { format, parseISO, isBefore, startOfDay, isWithinInterval } from 'date-fns';
+import { Calendar } from '@/components/ui/calendar';
+import { Plus, Edit, Trash2, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, parseISO, eachDayOfInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -50,15 +45,8 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
   const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingHoliday, setDeletingHoliday] = useState<Holiday | null>(null);
-  const [viewingImage, setViewingImage] = useState<string | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'date-asc' | 'date-desc' | 'title-asc' | 'title-desc'>('date-asc');
-
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.25, 3));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
-  const handleResetZoom = () => setZoomLevel(1);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const fetchHolidays = async () => {
     setLoading(true);
@@ -125,86 +113,42 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
     setDeleteConfirmOpen(false);
   };
 
-  const handleDownloadImage = async (imageUrl: string, title: string) => {
-    try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${title.replace(/\s+/g, '-').toLowerCase()}-holiday.${blob.type.split('/')[1] || 'jpg'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      toast.success('Image downloaded');
-    } catch {
-      toast.error('Failed to download image');
-    }
-  };
-
-  const formatDateRange = (startDate: string, endDate: string) => {
-    const start = parseISO(startDate);
-    const end = parseISO(endDate);
-    if (startDate === endDate) {
-      return format(start, 'MMM dd, yyyy');
-    }
-    return `${format(start, 'MMM dd')} - ${format(end, 'MMM dd, yyyy')}`;
-  };
-
-  const today = startOfDay(new Date());
-
-  const isHolidayToday = (holiday: Holiday) => {
-    const start = startOfDay(parseISO(holiday.start_date));
-    const end = startOfDay(parseISO(holiday.end_date));
-    return isWithinInterval(today, { start, end });
-  };
-
-  const upcomingHolidays = holidays.filter((h) => !isBefore(parseISO(h.end_date), today));
-  const pastHolidays = holidays.filter((h) => isBefore(parseISO(h.end_date), today));
-
-  const filteredAndSortedHolidays = useMemo(() => {
-    // Filter by tab
-    let result = holidays.filter((holiday) => {
-      const endDate = parseISO(holiday.end_date);
-      if (filter === 'upcoming') return !isBefore(endDate, today);
-      if (filter === 'past') return isBefore(endDate, today);
-      return true;
+  // Get holidays for a specific date
+  const getHolidaysForDate = (date: Date) => {
+    return holidays.filter((holiday) => {
+      const start = parseISO(holiday.start_date);
+      const end = parseISO(holiday.end_date);
+      return date >= start && date <= end;
     });
+  };
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (h) =>
-          h.title.toLowerCase().includes(query) ||
-          (h.message && h.message.toLowerCase().includes(query))
-      );
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case 'date-asc':
-          return parseISO(a.start_date).getTime() - parseISO(b.start_date).getTime();
-        case 'date-desc':
-          return parseISO(b.start_date).getTime() - parseISO(a.start_date).getTime();
-        case 'title-asc':
-          return a.title.localeCompare(b.title);
-        case 'title-desc':
-          return b.title.localeCompare(a.title);
-        default:
-          return 0;
-      }
+  // Get all dates that have holidays
+  const holidayDates = useMemo(() => {
+    const dates: Date[] = [];
+    holidays.forEach((holiday) => {
+      const start = parseISO(holiday.start_date);
+      const end = parseISO(holiday.end_date);
+      const daysInRange = eachDayOfInterval({ start, end });
+      dates.push(...daysInRange);
     });
+    return dates;
+  }, [holidays]);
 
-    return result;
-  }, [holidays, filter, searchQuery, sortBy, today]);
+  // Selected date holidays
+  const selectedDateHolidays = selectedDate ? getHolidaysForDate(selectedDate) : [];
+
+  const handlePrevMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="pr-8 shrink-0">
             <div className="flex items-center justify-between gap-4">
               <DialogTitle className="flex items-center gap-2">
@@ -220,187 +164,136 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
             </div>
           </DialogHeader>
 
-          {/* Filter Tabs */}
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as 'all' | 'upcoming' | 'past')} className="shrink-0">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all" className="gap-2">
-                All
-                <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
-                  {holidays.length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="upcoming" className="gap-2">
-                Upcoming
-                <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
-                  {upcomingHolidays.length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="past" className="gap-2">
-                Past
-                <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs">
-                  {pastHolidays.length}
-                </Badge>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 overflow-auto">
+            {/* Calendar Section */}
+            <div className="flex-1 flex flex-col items-center">
+              {/* Month Navigation */}
+              <div className="flex items-center justify-between w-full max-w-sm mb-4">
+                <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <h3 className="font-semibold text-lg">
+                  {format(currentMonth, 'MMMM yyyy')}
+                </h3>
+                <Button variant="outline" size="icon" onClick={handleNextMonth}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
 
-          {/* Search and Sort */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search holidays..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-              <SelectTrigger className="w-[160px]">
-                <ArrowUpDown className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="date-asc">Date (Oldest)</SelectItem>
-                <SelectItem value="date-desc">Date (Newest)</SelectItem>
-                <SelectItem value="title-asc">Title (A-Z)</SelectItem>
-                <SelectItem value="title-desc">Title (Z-A)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-4 pb-4">
               {loading ? (
                 <div className="text-center py-8 text-muted-foreground">Loading...</div>
-              ) : filteredAndSortedHolidays.length === 0 ? (
-                <div className="text-center py-12">
-                  <CalendarDays className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    {holidays.length === 0 
-                      ? 'No holidays added yet' 
-                      : searchQuery 
-                        ? 'No holidays match your search' 
-                        : `No ${filter} holidays`}
-                  </p>
-                </div>
               ) : (
-                filteredAndSortedHolidays.map((holiday, index) => {
-                  const isTodayHoliday = isHolidayToday(holiday);
-                  return (
-                  <Card 
-                    key={holiday.id} 
-                    className={`overflow-hidden animate-slide-up ${isTodayHoliday ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    {/* Today indicator */}
-                    {isTodayHoliday && (
-                      <div className="bg-primary text-primary-foreground px-3 py-1.5 flex items-center gap-2 text-sm font-medium">
-                        <Sparkles className="h-4 w-4" />
-                        Happening Today!
-                      </div>
-                    )}
-                    <CardContent className="p-0">
-                      <div className="flex flex-col sm:flex-row">
-                        {/* Image Section */}
-                        {holiday.image_url && (
-                          <div className="relative sm:w-40 h-32 sm:h-auto shrink-0 bg-muted">
-                            <img
-                              src={holiday.image_url}
-                              alt={holiday.title}
-                              className="w-full h-full object-cover cursor-pointer"
-                              onClick={() => setViewingImage(holiday.image_url!)}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                            {/* Download button overlay */}
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="absolute bottom-2 right-2 h-8 w-8 opacity-90"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDownloadImage(holiday.image_url!, holiday.title);
-                              }}
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-
-                        {/* Content Section */}
-                        <div className="flex-1 p-4">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-lg">{holiday.title}</h3>
-                              <div className="flex items-center gap-2 text-sm text-primary mt-1">
-                                <CalendarDays className="h-4 w-4" />
-                                {formatDateRange(holiday.start_date, holiday.end_date)}
-                              </div>
-                              {holiday.message && (
-                                <p className="text-sm text-muted-foreground mt-2">{holiday.message}</p>
-                              )}
-                            </div>
-
-                            {/* Admin Actions */}
-                            {isAdmin && (
-                              <div className="flex gap-1 shrink-0">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    setEditingHoliday(holiday);
-                                    setFormOpen(true);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => {
-                                    setDeletingHoliday(holiday);
-                                    setDeleteConfirmOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* View/Download for non-image cards */}
-                          {holiday.image_url && (
-                            <div className="flex items-center gap-2 mt-3 sm:hidden">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setViewingImage(holiday.image_url!)}
-                              >
-                                <ImageIcon className="h-4 w-4 mr-2" />
-                                View Image
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDownloadImage(holiday.image_url!, holiday.title)}
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                Download
-                              </Button>
-                            </div>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  month={currentMonth}
+                  onMonthChange={setCurrentMonth}
+                  className="rounded-md border pointer-events-auto"
+                  modifiers={{
+                    holiday: holidayDates,
+                  }}
+                  modifiersClassNames={{
+                    holiday: 'bg-primary/20 text-primary font-semibold',
+                  }}
+                  components={{
+                    DayContent: ({ date }) => {
+                      const dayHolidays = getHolidaysForDate(date);
+                      const hasHoliday = dayHolidays.length > 0;
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center">
+                          <span>{date.getDate()}</span>
+                          {hasHoliday && (
+                            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-primary" />
                           )}
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  );
-                })
+                      );
+                    },
+                  }}
+                />
               )}
             </div>
-          </ScrollArea>
+
+            {/* Selected Date Details */}
+            <div className="lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l pt-4 lg:pt-0 lg:pl-6">
+              <h4 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide">
+                {selectedDate ? format(selectedDate, 'EEEE, MMM d, yyyy') : 'Select a date'}
+              </h4>
+              
+              {selectedDate && selectedDateHolidays.length === 0 && (
+                <p className="text-sm text-muted-foreground">No holidays on this date</p>
+              )}
+
+              <div className="space-y-3">
+                {selectedDateHolidays.map((holiday) => (
+                  <div
+                    key={holiday.id}
+                    className="p-3 rounded-lg border bg-card"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h5 className="font-medium text-sm">{holiday.title}</h5>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {format(parseISO(holiday.start_date), 'MMM d')} - {format(parseISO(holiday.end_date), 'MMM d, yyyy')}
+                        </p>
+                        {holiday.message && (
+                          <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                            {holiday.message}
+                          </p>
+                        )}
+                      </div>
+                      {isAdmin && (
+                        <div className="flex gap-1 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setEditingHoliday(holiday);
+                              setFormOpen(true);
+                            }}
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setDeletingHoliday(holiday);
+                              setDeleteConfirmOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {!selectedDate && holidays.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground mb-2">Upcoming Holidays:</p>
+                  <div className="space-y-2">
+                    {holidays.slice(0, 3).map((holiday) => (
+                      <div
+                        key={holiday.id}
+                        className="text-xs p-2 rounded bg-muted/50 cursor-pointer hover:bg-muted"
+                        onClick={() => setSelectedDate(parseISO(holiday.start_date))}
+                      >
+                        <span className="font-medium">{holiday.title}</span>
+                        <span className="text-muted-foreground ml-2">
+                          {format(parseISO(holiday.start_date), 'MMM d')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -430,60 +323,6 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Full-screen Image Viewer */}
-      <Dialog
-        open={!!viewingImage}
-        onOpenChange={(open) => {
-          if (!open) {
-            setViewingImage(null);
-            setZoomLevel(1);
-          }
-        }}
-      >
-        <DialogContent className="max-w-6xl h-[95vh] p-0 overflow-hidden">
-          <div className="flex h-full flex-col min-h-0">
-            <div className="border-b p-4 pr-12 flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2 font-semibold">
-                <ImageIcon className="h-5 w-5 text-primary" />
-                <span>Holiday Image</span>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => viewingImage && handleDownloadImage(viewingImage, 'holiday')}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-                <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={zoomLevel <= 0.5}>
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <span className="text-sm w-14 text-center">{Math.round(zoomLevel * 100)}%</span>
-                <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={zoomLevel >= 3}>
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={handleResetZoom}>
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {viewingImage && (
-              <div className="flex-1 min-h-0 overflow-auto p-4">
-                <img
-                  src={viewingImage}
-                  alt="Holiday"
-                  className="mx-auto"
-                  style={{ width: `${zoomLevel * 100}%` }}
-                />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
