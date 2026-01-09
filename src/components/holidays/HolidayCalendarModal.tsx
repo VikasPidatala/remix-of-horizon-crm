@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Plus, Edit, Trash2, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Plus, Edit, Trash2, CalendarDays, ChevronLeft, ChevronRight, ImageIcon, Download, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { format, parseISO, eachDayOfInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,6 +48,30 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
   const [deletingHoliday, setDeletingHoliday] = useState<Holiday | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [viewingImage, setViewingImage] = useState<{ url: string; title: string } | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
+  const handleResetZoom = () => setZoomLevel(1);
+
+  const handleDownloadImage = async (imageUrl: string, title: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title.replace(/\s+/g, '-').toLowerCase()}-holiday.${blob.type.split('/')[1] || 'jpg'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success('Image downloaded');
+    } catch {
+      toast.error('Failed to download image');
+    }
+  };
 
   const fetchHolidays = async () => {
     setLoading(true);
@@ -224,54 +249,100 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
                 <p className="text-sm text-muted-foreground">No holidays on this date</p>
               )}
 
-              <div className="space-y-3">
-                {selectedDateHolidays.map((holiday) => (
-                  <div
-                    key={holiday.id}
-                    className="p-3 rounded-lg border bg-card"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h5 className="font-medium text-sm">{holiday.title}</h5>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {format(parseISO(holiday.start_date), 'MMM d')} - {format(parseISO(holiday.end_date), 'MMM d, yyyy')}
-                        </p>
-                        {holiday.message && (
-                          <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                            {holiday.message}
+              <ScrollArea className="max-h-[300px] lg:max-h-[400px]">
+                <div className="space-y-3 pr-2">
+                  {selectedDateHolidays.map((holiday) => (
+                    <div
+                      key={holiday.id}
+                      className="p-3 rounded-lg border bg-card"
+                    >
+                      {/* Holiday Image Thumbnail */}
+                      {holiday.image_url && (
+                        <div 
+                          className="relative w-full h-24 sm:h-32 mb-3 rounded-md overflow-hidden bg-muted cursor-pointer group"
+                          onClick={() => setViewingImage({ url: holiday.image_url!, title: holiday.title })}
+                        >
+                          <img
+                            src={holiday.image_url}
+                            alt={holiday.title}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                            <ImageIcon className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h5 className="font-medium text-sm">{holiday.title}</h5>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {format(parseISO(holiday.start_date), 'MMM d')} - {format(parseISO(holiday.end_date), 'MMM d, yyyy')}
                           </p>
+                          {holiday.message && (
+                            <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                              {holiday.message}
+                            </p>
+                          )}
+                        </div>
+                        {isAdmin && (
+                          <div className="flex gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => {
+                                setEditingHoliday(holiday);
+                                setFormOpen(true);
+                              }}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                setDeletingHoliday(holiday);
+                                setDeleteConfirmOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         )}
                       </div>
-                      {isAdmin && (
-                        <div className="flex gap-1 shrink-0">
+
+                      {/* View/Download buttons for mobile */}
+                      {holiday.image_url && (
+                        <div className="flex items-center gap-2 mt-3">
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => {
-                              setEditingHoliday(holiday);
-                              setFormOpen(true);
-                            }}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-xs h-8"
+                            onClick={() => setViewingImage({ url: holiday.image_url!, title: holiday.title })}
                           >
-                            <Edit className="h-3.5 w-3.5" />
+                            <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                            View
                           </Button>
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => {
-                              setDeletingHoliday(holiday);
-                              setDeleteConfirmOpen(true);
-                            }}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-xs h-8"
+                            onClick={() => handleDownloadImage(holiday.image_url!, holiday.title)}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Download className="h-3.5 w-3.5 mr-1.5" />
+                            Download
                           </Button>
                         </div>
                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </ScrollArea>
 
               {!selectedDate && holidays.length > 0 && (
                 <div className="mt-4">
@@ -323,6 +394,79 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Full-screen Image Viewer */}
+      <Dialog
+        open={!!viewingImage}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingImage(null);
+            setZoomLevel(1);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[95vw] sm:max-w-4xl h-[90vh] sm:h-[85vh] p-0 overflow-hidden">
+          <div className="flex h-full flex-col min-h-0">
+            {/* Header with controls */}
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-background shrink-0">
+              <h3 className="font-semibold text-sm sm:text-base truncate flex-1 mr-2">
+                {viewingImage?.title}
+              </h3>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleZoomOut}
+                  disabled={zoomLevel <= 0.5}
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <span className="text-xs sm:text-sm font-medium w-12 text-center">
+                  {Math.round(zoomLevel * 100)}%
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleZoomIn}
+                  disabled={zoomLevel >= 3}
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleResetZoom}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => viewingImage && handleDownloadImage(viewingImage.url, viewingImage.title)}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Image container */}
+            <div className="flex-1 overflow-auto bg-muted/30 flex items-center justify-center p-2 sm:p-4">
+              {viewingImage && (
+                <img
+                  src={viewingImage.url}
+                  alt={viewingImage.title}
+                  className="max-w-full max-h-full object-contain transition-transform duration-200"
+                  style={{ transform: `scale(${zoomLevel})` }}
+                />
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
