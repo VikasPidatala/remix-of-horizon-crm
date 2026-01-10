@@ -197,9 +197,23 @@ export default function HolidayCalendarModal({ open, onOpenChange }: HolidayCale
                 <Button variant="outline" size="icon" onClick={handlePrevMonth}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <h3 className="font-semibold text-lg">
-                  {format(currentMonth, 'MMMM yyyy')}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-lg">
+                    {format(currentMonth, 'MMMM yyyy')}
+                  </h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs h-7 px-2"
+                    onClick={() => {
+                      const today = new Date();
+                      setCurrentMonth(today);
+                      setSelectedDate(today);
+                    }}
+                  >
+                    Today
+                  </Button>
+                </div>
                 <Button variant="outline" size="icon" onClick={handleNextMonth}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
