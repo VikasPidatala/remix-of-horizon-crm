@@ -12,6 +12,23 @@ export type RequirementType = 'villa' | 'apartment' | 'house' | 'plot';
 
 export type LeadSource = 'call' | 'walk_in' | 'website' | 'referral';
 
+export type CallStatus = 'new' | 'contacted' | 'not_answered' | 'callback' | 'converted';
+
+export interface Call {
+  id: string;
+  name?: string;
+  phone: string;
+  email?: string;
+  source?: string;
+  status: CallStatus;
+  notes?: string;
+  callDate: Date;
+  callTime?: string;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface User {
   id: string;
   userId: string; // Auto-generated login ID (e.g., "john_admin_001")
