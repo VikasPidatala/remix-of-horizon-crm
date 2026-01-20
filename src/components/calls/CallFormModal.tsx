@@ -30,9 +30,8 @@ interface CallFormModalProps {
 const CALL_SOURCES = ['Website', 'Facebook', 'Instagram', 'Google Ads', 'Referral', 'Walk-in', 'Other'];
 const CALL_STATUSES: { value: CallStatus; label: string }[] = [
   { value: 'new', label: 'New' },
-  { value: 'contacted', label: 'Contacted' },
+  { value: 'answered', label: 'Answered' },
   { value: 'not_answered', label: 'Not Answered' },
-  { value: 'callback', label: 'Callback' },
   { value: 'converted', label: 'Converted' },
 ];
 
@@ -46,6 +45,8 @@ export default function CallFormModal({ open, onClose, onSave, call }: CallFormM
     notes: '',
     callDate: format(new Date(), 'yyyy-MM-dd'),
     callTime: format(new Date(), 'HH:mm'),
+    reminderDate: '',
+    reminderTime: '',
   });
 
   useEffect(() => {
@@ -59,6 +60,8 @@ export default function CallFormModal({ open, onClose, onSave, call }: CallFormM
         notes: call.notes || '',
         callDate: format(call.callDate, 'yyyy-MM-dd'),
         callTime: call.callTime || '',
+        reminderDate: call.reminderDate ? format(call.reminderDate, 'yyyy-MM-dd') : '',
+        reminderTime: call.reminderTime || '',
       });
     } else {
       setFormData({
@@ -70,6 +73,8 @@ export default function CallFormModal({ open, onClose, onSave, call }: CallFormM
         notes: '',
         callDate: format(new Date(), 'yyyy-MM-dd'),
         callTime: format(new Date(), 'HH:mm'),
+        reminderDate: '',
+        reminderTime: '',
       });
     }
   }, [call, open]);
@@ -85,6 +90,8 @@ export default function CallFormModal({ open, onClose, onSave, call }: CallFormM
       notes: formData.notes || undefined,
       callDate: new Date(formData.callDate),
       callTime: formData.callTime || undefined,
+      reminderDate: formData.reminderDate ? new Date(formData.reminderDate) : undefined,
+      reminderTime: formData.reminderTime || undefined,
       createdBy: '', // Will be set by the context
     });
     onClose();
@@ -186,6 +193,31 @@ export default function CallFormModal({ open, onClose, onSave, call }: CallFormM
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Reminder Section */}
+          <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+            <Label className="text-sm font-medium">Set Reminder</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="reminderDate" className="text-xs text-muted-foreground">Date</Label>
+                <Input
+                  id="reminderDate"
+                  type="date"
+                  value={formData.reminderDate}
+                  onChange={(e) => setFormData({ ...formData, reminderDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reminderTime" className="text-xs text-muted-foreground">Time</Label>
+                <Input
+                  id="reminderTime"
+                  type="time"
+                  value={formData.reminderTime}
+                  onChange={(e) => setFormData({ ...formData, reminderTime: e.target.value })}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

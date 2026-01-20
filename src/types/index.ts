@@ -12,7 +12,7 @@ export type RequirementType = 'villa' | 'apartment' | 'house' | 'plot';
 
 export type LeadSource = 'call' | 'walk_in' | 'website' | 'referral';
 
-export type CallStatus = 'new' | 'contacted' | 'not_answered' | 'callback' | 'converted';
+export type CallStatus = 'new' | 'answered' | 'not_answered' | 'converted';
 
 export interface Call {
   id: string;
@@ -24,6 +24,8 @@ export interface Call {
   notes?: string;
   callDate: Date;
   callTime?: string;
+  reminderDate?: Date;
+  reminderTime?: string;
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;

@@ -8,7 +8,7 @@ import CallList from '@/components/calls/CallList';
 import CallFormModal from '@/components/calls/CallFormModal';
 import CallExcelImport from '@/components/calls/CallExcelImport';
 import LeadFormModal from '@/components/leads/LeadFormModal';
-import { Call, Lead } from '@/types';
+import { Call, CallStatus, Lead } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   AlertDialog,
@@ -62,6 +62,10 @@ export default function ManagerCalls() {
     }
   };
 
+  const handleStatusChange = async (id: string, status: CallStatus) => {
+    await updateCall(id, { status });
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex flex-col min-h-0">
@@ -97,6 +101,7 @@ export default function ManagerCalls() {
           onEdit={setEditingCall}
           onDelete={setDeleteConfirmId}
           onConvertToLead={handleConvertToLead}
+          onStatusChange={handleStatusChange}
         />
       </div>
 

@@ -136,6 +136,8 @@ export type Database = {
           name: string | null
           notes: string | null
           phone: string
+          reminder_date: string | null
+          reminder_time: string | null
           source: string | null
           status: string
           updated_at: string
@@ -150,6 +152,8 @@ export type Database = {
           name?: string | null
           notes?: string | null
           phone: string
+          reminder_date?: string | null
+          reminder_time?: string | null
           source?: string | null
           status?: string
           updated_at?: string
@@ -164,6 +168,8 @@ export type Database = {
           name?: string | null
           notes?: string | null
           phone?: string
+          reminder_date?: string | null
+          reminder_time?: string | null
           source?: string | null
           status?: string
           updated_at?: string
