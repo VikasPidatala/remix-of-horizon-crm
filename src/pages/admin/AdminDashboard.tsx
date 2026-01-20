@@ -9,6 +9,7 @@ import RemindersWidget from '@/components/dashboard/RemindersWidget';
 import CalendarView from '@/components/dashboard/CalendarView';
 import AnnouncementBanner from '@/components/announcements/AnnouncementBanner';
 import { useData } from '@/contexts/DataContext';
+import { useCalls } from '@/contexts/CallsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ActivityLog } from '@/types';
@@ -16,6 +17,7 @@ import { ClipboardList, CheckSquare, Building, CalendarOff, Users, TrendingUp } 
 
 export default function AdminDashboard() {
   const { leads, tasks, projects, announcements } = useData();
+  const { calls } = useCalls();
   const { user } = useAuth();
   const [pendingLeaves, setPendingLeaves] = useState(0);
   const [teamCount, setTeamCount] = useState(0);
@@ -152,7 +154,7 @@ export default function AdminDashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Reminders Widget */}
-          <RemindersWidget leads={leads} tasks={tasks} />
+          <RemindersWidget leads={leads} tasks={tasks} calls={calls} />
 
           {/* Activity Feed */}
           <div className="animate-slide-up" style={{ animationDelay: '200ms' }}>

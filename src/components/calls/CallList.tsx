@@ -43,16 +43,31 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead, onS
   const [statusFilter, setStatusFilter] = useState<CallStatus | 'all'>('all');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  // Group calls by date
+  // Group calls by date (including reminder dates)
   const callsByDate = useMemo(() => {
     const grouped: Record<string, Call[]> = {};
     
     calls.forEach(call => {
+      // Add to call date
       const dateKey = format(call.callDate, 'yyyy-MM-dd');
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
       }
-      grouped[dateKey].push(call);
+      if (!grouped[dateKey].some(c => c.id === call.id)) {
+        grouped[dateKey].push(call);
+      }
+
+      // Also add to reminder date if set
+      if (call.reminderDate && call.status !== 'converted') {
+        const reminderDateKey = format(call.reminderDate, 'yyyy-MM-dd');
+        if (!grouped[reminderDateKey]) {
+          grouped[reminderDateKey] = [];
+        }
+        // Avoid duplicates if reminder date equals call date
+        if (!grouped[reminderDateKey].some(c => c.id === call.id)) {
+          grouped[reminderDateKey].push(call);
+        }
+      }
     });
 
     return grouped;

@@ -9,6 +9,7 @@ import CalendarView from '@/components/dashboard/CalendarView';
 import LeaveStatsWidget from '@/components/dashboard/LeaveStatsWidget';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
+import { useCalls } from '@/contexts/CallsContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ClipboardList, CheckSquare, CalendarOff, Bell, Target } from 'lucide-react';
 import { format } from 'date-fns';
@@ -18,6 +19,7 @@ import TaskStatusChip from '@/components/tasks/TaskStatusChip';
 export default function StaffDashboard() {
   const { user } = useAuth();
   const { leads, tasks, announcements } = useData();
+  const { calls } = useCalls();
   const [pendingLeaves, setPendingLeaves] = useState(0);
   
   useEffect(() => {
@@ -39,8 +41,9 @@ export default function StaffDashboard() {
   // Filter data for current staff - show all data visible to staff
   const myLeads = leads.filter(l => l.createdBy === user?.id);
   const myTasks = tasks.filter(t => t.assignedTo === user?.id);
+  const myCalls = calls.filter(c => c.createdBy === user?.id);
   const activeTasks = myTasks.filter(t => t.status !== 'completed' && t.status !== 'rejected').length;
-  const reminders = myLeads.filter(l => l.status === 'reminder').length;
+  const reminders = myLeads.filter(l => l.status === 'reminder').length + myCalls.filter(c => c.reminderDate).length;
 
   return (
     <div className="min-h-screen">
@@ -101,7 +104,7 @@ export default function StaffDashboard() {
           <TaskStatusChart tasks={myTasks} title="My Tasks by Status" />
 
           {/* Reminders Widget */}
-          <RemindersWidget leads={myLeads} tasks={myTasks} />
+          <RemindersWidget leads={myLeads} tasks={myTasks} calls={myCalls} />
         </div>
 
         {/* Calendar View */}
