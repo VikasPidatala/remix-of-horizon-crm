@@ -108,7 +108,7 @@ export default function StaffDashboard() {
         </div>
 
         {/* Calendar View */}
-        <CalendarView leads={myLeads} tasks={myTasks} title="My Calendar" />
+        <CalendarView leads={myLeads} tasks={myTasks} calls={myCalls} title="My Calendar" />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent Tasks */}
