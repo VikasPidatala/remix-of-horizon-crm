@@ -7,6 +7,7 @@ import LeadStatusChart from '@/components/dashboard/LeadStatusChart';
 import RemindersWidget from '@/components/dashboard/RemindersWidget';
 import CalendarView from '@/components/dashboard/CalendarView';
 import { useData } from '@/contexts/DataContext';
+import { useCalls } from '@/contexts/CallsContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Building, ClipboardList, CheckSquare, CalendarOff } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -19,6 +20,7 @@ interface StaffMember {
 
 export default function ManagerDashboard() {
   const { leads, tasks, projects, announcements } = useData();
+  const { calls } = useCalls();
   const [pendingLeaves, setPendingLeaves] = useState(0);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
 
@@ -147,7 +149,7 @@ export default function ManagerDashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Reminders Widget */}
-          <RemindersWidget leads={leads} tasks={tasks} />
+          <RemindersWidget leads={leads} tasks={tasks} calls={calls} />
 
           {/* Team Overview */}
           <div className="glass-card rounded-2xl p-6 animate-slide-up" style={{ animationDelay: '150ms' }}>

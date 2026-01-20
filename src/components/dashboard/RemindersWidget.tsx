@@ -1,17 +1,19 @@
-import { Lead, Task } from '@/types';
+import { Lead, Task, Call } from '@/types';
 import { format, isAfter, isBefore, addDays, isToday } from 'date-fns';
 import { Bell, Calendar, Phone, ClipboardList, CheckSquare, AlertTriangle, Volume2 } from 'lucide-react';
 import LeadStatusChip from '@/components/leads/LeadStatusChip';
 import TaskStatusChip from '@/components/tasks/TaskStatusChip';
+import CallStatusChip from '@/components/calls/CallStatusChip';
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 
 interface RemindersWidgetProps {
   leads: Lead[];
   tasks: Task[];
+  calls?: Call[];
 }
 
-export default function RemindersWidget({ leads, tasks }: RemindersWidgetProps) {
+export default function RemindersWidget({ leads, tasks, calls = [] }: RemindersWidgetProps) {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const today = new Date();
   const nextWeek = addDays(today, 7);
@@ -50,8 +52,36 @@ export default function RemindersWidget({ leads, tasks }: RemindersWidgetProps) 
     t.status !== 'rejected'
   ).sort((a, b) => a.nextActionDate!.getTime() - b.nextActionDate!.getTime());
 
-  const totalReminders = upcomingLeadReminders.length + upcomingTaskReminders.length;
-  const totalOverdue = overdueLeadReminders.length + overdueTaskReminders.length;
+  // Get calls with upcoming reminders
+  const upcomingCallReminders = calls.filter(c => 
+    c.reminderDate && 
+    c.status !== 'converted' &&
+    isAfter(c.reminderDate, today) &&
+    isBefore(c.reminderDate, nextWeek)
+  ).sort((a, b) => a.reminderDate!.getTime() - b.reminderDate!.getTime());
+
+  // Today's call reminders
+  const todayCallReminders = calls.filter(c => 
+    c.reminderDate && 
+    c.status !== 'converted' &&
+    isToday(c.reminderDate)
+  ).sort((a, b) => {
+    if (a.reminderTime && b.reminderTime) {
+      return a.reminderTime.localeCompare(b.reminderTime);
+    }
+    return 0;
+  });
+
+  // Overdue call reminders
+  const overdueCallReminders = calls.filter(c => 
+    c.reminderDate && 
+    c.status !== 'converted' &&
+    isBefore(c.reminderDate, today) &&
+    !isToday(c.reminderDate)
+  ).sort((a, b) => a.reminderDate!.getTime() - b.reminderDate!.getTime());
+
+  const totalReminders = upcomingLeadReminders.length + upcomingTaskReminders.length + upcomingCallReminders.length + todayCallReminders.length;
+  const totalOverdue = overdueLeadReminders.length + overdueTaskReminders.length + overdueCallReminders.length;
 
   const playNotificationSound = useCallback(() => {
     try {
@@ -80,6 +110,10 @@ export default function RemindersWidget({ leads, tasks }: RemindersWidgetProps) 
       playNotificationSound();
     }
   }, [soundEnabled, totalReminders, totalOverdue, playNotificationSound]);
+
+  const handleCall = (phone: string) => {
+    window.location.href = `tel:${phone}`;
+  };
 
   return (
     <div className="glass-card rounded-2xl p-6 animate-slide-up relative overflow-hidden" style={{ animationDelay: '200ms' }}>
@@ -131,6 +165,32 @@ export default function RemindersWidget({ leads, tasks }: RemindersWidgetProps) 
                 <AlertTriangle className="w-4 h-4" />
                 Overdue ({totalOverdue})
               </div>
+              {overdueCallReminders.map((call, index) => (
+                <div 
+                  key={call.id}
+                  className="flex items-center gap-4 p-3 rounded-xl bg-destructive/10 border border-destructive/30 animate-fade-in cursor-pointer hover:bg-destructive/15"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  onClick={() => handleCall(call.phone)}
+                >
+                  <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center text-destructive shrink-0">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{call.name || 'Unknown'}</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Phone className="w-3 h-3" />
+                      <span className="truncate">{call.phone}</span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="flex items-center gap-1 text-sm text-destructive mb-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {format(call.reminderDate!, 'MMM dd')}
+                    </div>
+                    <CallStatusChip status={call.status} />
+                  </div>
+                </div>
+              ))}
               {overdueLeadReminders.map((lead, index) => (
                 <div 
                   key={lead.id}
@@ -177,6 +237,79 @@ export default function RemindersWidget({ leads, tasks }: RemindersWidgetProps) 
                       {format(task.nextActionDate!, 'MMM dd')}
                     </div>
                     <TaskStatusChip status={task.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Today's Call Reminders */}
+          {todayCallReminders.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
+                <Phone className="w-4 h-4" />
+                Call Reminders Today ({todayCallReminders.length})
+              </div>
+              {todayCallReminders.map((call, index) => (
+                <div 
+                  key={call.id}
+                  className="flex items-center gap-4 p-3 rounded-xl bg-amber-50 border border-amber-200 animate-fade-in cursor-pointer hover:bg-amber-100 transition-colors"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  onClick={() => handleCall(call.phone)}
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shrink-0">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{call.name || 'Unknown'}</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Phone className="w-3 h-3" />
+                      <span className="truncate">{call.phone}</span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="flex items-center gap-1 text-sm text-amber-600 mb-1">
+                      <Bell className="w-3.5 h-3.5" />
+                      {call.reminderTime || 'Today'}
+                    </div>
+                    <CallStatusChip status={call.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Upcoming Call Reminders */}
+          {upcomingCallReminders.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Phone className="w-4 h-4" />
+                Upcoming Call Reminders ({upcomingCallReminders.length})
+              </div>
+              {upcomingCallReminders.map((call, index) => (
+                <div 
+                  key={call.id}
+                  className="flex items-center gap-4 p-3 rounded-xl bg-amber-50/50 border border-amber-200/50 animate-fade-in cursor-pointer hover:bg-amber-50 transition-colors"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  onClick={() => handleCall(call.phone)}
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shrink-0">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{call.name || 'Unknown'}</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Phone className="w-3 h-3" />
+                      <span className="truncate">{call.phone}</span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="flex items-center gap-1 text-sm text-amber-600 mb-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {format(call.reminderDate!, 'MMM dd')}
+                      {call.reminderTime && ` ${call.reminderTime}`}
+                    </div>
+                    <CallStatusChip status={call.status} />
                   </div>
                 </div>
               ))}
