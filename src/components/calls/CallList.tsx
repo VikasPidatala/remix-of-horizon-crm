@@ -32,10 +32,10 @@ interface CallListProps {
   onStatusChange?: (id: string, status: CallStatus) => void;
 }
 
-const STATUS_OPTIONS: { value: CallStatus; label: string; color: string }[] = [
-  { value: 'new', label: 'New', color: 'bg-blue-500' },
-  { value: 'answered', label: 'Answered', color: 'bg-green-500' },
-  { value: 'not_answered', label: 'Not Answered', color: 'bg-orange-500' },
+const STATUS_OPTIONS: { value: CallStatus; label: string }[] = [
+  { value: 'new', label: 'New' },
+  { value: 'answered', label: 'Answered' },
+  { value: 'not_answered', label: 'Not Answered' },
 ];
 
 export default function CallList({ calls, onEdit, onDelete, onConvertToLead, onStatusChange }: CallListProps) {
@@ -262,22 +262,26 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead, onS
                           Converted
                         </Badge>
                       ) : (
-                        <div className="flex gap-1">
-                          {STATUS_OPTIONS.map((option) => (
-                            <Button
-                              key={option.value}
-                              variant={call.status === option.value ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handleQuickStatusChange(call.id, option.value)}
-                              className={cn(
-                                "h-7 px-2 text-xs",
-                                call.status === option.value && option.color
-                              )}
-                            >
-                              {option.label}
-                            </Button>
-                          ))}
-                        </div>
+                        <Select
+                          value={call.status}
+                          onValueChange={(value) => handleQuickStatusChange(call.id, value as CallStatus)}
+                        >
+                          <SelectTrigger className={cn(
+                            "w-[140px] h-8 text-xs font-medium",
+                            call.status === 'new' && "bg-blue-50 border-blue-200 text-blue-700",
+                            call.status === 'answered' && "bg-green-50 border-green-200 text-green-700",
+                            call.status === 'not_answered' && "bg-orange-50 border-orange-200 text-orange-700"
+                          )}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border border-border z-50">
+                            {STATUS_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       )}
                     </TableCell>
                     <TableCell>
