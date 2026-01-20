@@ -27,6 +27,8 @@ const dbToCall = (row: any): Call => ({
   notes: row.notes || undefined,
   callDate: new Date(row.call_date),
   callTime: row.call_time || undefined,
+  reminderDate: row.reminder_date ? new Date(row.reminder_date) : undefined,
+  reminderTime: row.reminder_time || undefined,
   createdBy: row.created_by,
   createdAt: new Date(row.created_at),
   updatedAt: new Date(row.updated_at),
@@ -106,6 +108,8 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
       notes: call.notes,
       call_date: call.callDate.toISOString().split('T')[0],
       call_time: call.callTime,
+      reminder_date: call.reminderDate ? call.reminderDate.toISOString().split('T')[0] : null,
+      reminder_time: call.reminderTime || null,
       created_by: user.id,
     }]).select();
 
@@ -165,6 +169,8 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     if (data.notes !== undefined) updateData.notes = data.notes;
     if (data.callDate !== undefined) updateData.call_date = data.callDate.toISOString().split('T')[0];
     if (data.callTime !== undefined) updateData.call_time = data.callTime;
+    if (data.reminderDate !== undefined) updateData.reminder_date = data.reminderDate ? data.reminderDate.toISOString().split('T')[0] : null;
+    if (data.reminderTime !== undefined) updateData.reminder_time = data.reminderTime || null;
 
     const { error } = await supabase.from('calls').update(updateData).eq('id', id);
 

@@ -17,12 +17,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Phone, Calendar, Clock, ArrowRight, Trash2, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, isSameDay, parseISO, addDays, subDays, startOfDay, eachDayOfInterval } from 'date-fns';
-import CallStatusChip from './CallStatusChip';
+import { Search, Phone, Calendar, Clock, ArrowRight, Trash2, Edit, ChevronLeft, ChevronRight, Bell } from 'lucide-react';
+import { format, isSameDay, addDays, subDays, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface CallListProps {
@@ -30,9 +29,16 @@ interface CallListProps {
   onEdit?: (call: Call) => void;
   onDelete?: (id: string) => void;
   onConvertToLead?: (call: Call) => void;
+  onStatusChange?: (id: string, status: CallStatus) => void;
 }
 
-export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: CallListProps) {
+const STATUS_OPTIONS: { value: CallStatus; label: string; color: string }[] = [
+  { value: 'new', label: 'New', color: 'bg-blue-500' },
+  { value: 'answered', label: 'Answered', color: 'bg-green-500' },
+  { value: 'not_answered', label: 'Not Answered', color: 'bg-orange-500' },
+];
+
+export default function CallList({ calls, onEdit, onDelete, onConvertToLead, onStatusChange }: CallListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<CallStatus | 'all'>('all');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -92,6 +98,12 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: C
     window.location.href = `tel:${phone}`;
   };
 
+  const handleQuickStatusChange = (callId: string, newStatus: CallStatus) => {
+    if (onStatusChange) {
+      onStatusChange(callId, newStatus);
+    }
+  };
+
   const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
   const callCountForSelectedDate = callsByDate[selectedDateKey]?.length || 0;
 
@@ -115,9 +127,8 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: C
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="new">New</SelectItem>
-            <SelectItem value="contacted">Contacted</SelectItem>
+            <SelectItem value="answered">Answered</SelectItem>
             <SelectItem value="not_answered">Not Answered</SelectItem>
-            <SelectItem value="callback">Callback</SelectItem>
             <SelectItem value="converted">Converted</SelectItem>
           </SelectContent>
         </Select>
@@ -214,10 +225,9 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: C
                 <TableRow>
                   <TableHead>Phone</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Time</TableHead>
-                  <TableHead>Source</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Reminder</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -238,7 +248,6 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: C
                       </Button>
                     </TableCell>
                     <TableCell>{call.name || '-'}</TableCell>
-                    <TableCell>{call.email || '-'}</TableCell>
                     <TableCell>
                       {call.callTime ? (
                         <div className="flex items-center gap-1 text-muted-foreground">
@@ -248,16 +257,43 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: C
                       ) : '-'}
                     </TableCell>
                     <TableCell>
-                      {call.source ? (
-                        <Badge variant="outline" className="capitalize">
-                          {call.source.replace('_', ' ')}
+                      {call.status === 'converted' ? (
+                        <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">
+                          Converted
                         </Badge>
-                      ) : '-'}
+                      ) : (
+                        <div className="flex gap-1">
+                          {STATUS_OPTIONS.map((option) => (
+                            <Button
+                              key={option.value}
+                              variant={call.status === option.value ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleQuickStatusChange(call.id, option.value)}
+                              className={cn(
+                                "h-7 px-2 text-xs",
+                                call.status === option.value && option.color
+                              )}
+                            >
+                              {option.label}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <CallStatusChip status={call.status} />
+                      {call.reminderDate ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <Bell className="h-3 w-3 text-amber-500" />
+                          <span>{format(call.reminderDate, 'MMM d')}</span>
+                          {call.reminderTime && (
+                            <span className="text-muted-foreground">{call.reminderTime}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
+                    <TableCell className="max-w-[150px] truncate">
                       {call.notes || '-'}
                     </TableCell>
                     <TableCell className="text-right">
