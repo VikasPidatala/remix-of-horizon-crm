@@ -125,6 +125,51 @@ export type Database = {
         }
         Relationships: []
       }
+      calls: {
+        Row: {
+          call_date: string
+          call_time: string | null
+          created_at: string
+          created_by: string
+          email: string | null
+          id: string
+          name: string | null
+          notes: string | null
+          phone: string
+          source: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          call_date?: string
+          call_time?: string | null
+          created_at?: string
+          created_by: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          notes?: string | null
+          phone: string
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          call_date?: string
+          call_time?: string | null
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          notes?: string | null
+          phone?: string
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       holiday_settings: {
         Row: {
           id: string

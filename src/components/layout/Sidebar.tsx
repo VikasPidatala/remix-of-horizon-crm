@@ -21,6 +21,7 @@ import {
   Bell,
   Palette,
   CalendarDays,
+  Phone,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { mockLeads, mockTasks } from '@/data/mockData';
@@ -62,6 +63,7 @@ const navItems: NavItem[] = [
   { label: 'Users', icon: Users, href: '/users', roles: ['admin'] },
   { label: 'Branding', icon: Palette, href: '/branding', roles: ['admin'] },
   { label: 'Announcements', icon: Megaphone, href: '/announcements', roles: ['admin', 'manager', 'staff'] },
+  { label: 'Calls', icon: Phone, href: '/calls', roles: ['admin', 'manager', 'staff'] },
   { label: 'Leads', icon: ClipboardList, href: '/leads', roles: ['admin', 'manager', 'staff'] },
   { label: 'Tasks', icon: CheckSquare, href: '/tasks', roles: ['admin', 'manager', 'staff'] },
   { label: 'Projects', icon: Building, href: '/projects', roles: ['admin', 'manager', 'staff'] },
