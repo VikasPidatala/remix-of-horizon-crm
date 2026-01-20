@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Lead, Task } from '@/types';
+import { Lead, Task, Call } from '@/types';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,22 +20,25 @@ import {
   ThumbsDown,
   Bell
 } from 'lucide-react';
-import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths } from 'date-fns';
+import { format, isSameDay, isToday, addMonths, subMonths } from 'date-fns';
 import LeadStatusChip from '@/components/leads/LeadStatusChip';
 import TaskStatusChip from '@/components/tasks/TaskStatusChip';
+import CallStatusChip from '@/components/calls/CallStatusChip';
 
 interface CalendarViewProps {
   leads: Lead[];
   tasks: Task[];
+  calls?: Call[];
   title?: string;
 }
 
 interface CalendarEvent {
   id: string;
-  type: 'lead' | 'task';
+  type: 'lead' | 'task' | 'call';
   title: string;
   date: Date;
-  data: Lead | Task;
+  data: Lead | Task | Call;
+  isReminder?: boolean;
 }
 
 const leadStatusIcons: Record<string, React.ElementType> = {
@@ -53,11 +56,11 @@ const taskStatusIcons: Record<string, React.ElementType> = {
   'rejected': XCircle,
 };
 
-export default function CalendarView({ leads, tasks, title = "Calendar" }: CalendarViewProps) {
+export default function CalendarView({ leads, tasks, calls = [], title = "Calendar" }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
-  // Get all events (lead follow-ups and task deadlines)
+  // Get all events (lead follow-ups, task deadlines, and calls)
   const events = useMemo(() => {
     const allEvents: CalendarEvent[] = [];
     
@@ -87,8 +90,33 @@ export default function CalendarView({ leads, tasks, title = "Calendar" }: Calen
       }
     });
 
+    // Add calls (both call dates and reminder dates)
+    calls.forEach(call => {
+      // Add call date
+      allEvents.push({
+        id: `call-${call.id}`,
+        type: 'call',
+        title: call.name || call.phone,
+        date: new Date(call.callDate),
+        data: call,
+        isReminder: false,
+      });
+
+      // Add reminder date if set
+      if (call.reminderDate && call.status !== 'converted') {
+        allEvents.push({
+          id: `call-reminder-${call.id}`,
+          type: 'call',
+          title: call.name || call.phone,
+          date: new Date(call.reminderDate),
+          data: call,
+          isReminder: true,
+        });
+      }
+    });
+
     return allEvents;
-  }, [leads, tasks]);
+  }, [leads, tasks, calls]);
 
   // Get events for selected date
   const selectedDateEvents = useMemo(() => {
@@ -109,14 +137,16 @@ export default function CalendarView({ leads, tasks, title = "Calendar" }: Calen
 
   // Count events per date
   const eventCountByDate = useMemo(() => {
-    const counts = new Map<string, { leads: number; tasks: number }>();
+    const counts = new Map<string, { leads: number; tasks: number; calls: number }>();
     events.forEach(event => {
       const dateKey = format(event.date, 'yyyy-MM-dd');
-      const current = counts.get(dateKey) || { leads: 0, tasks: 0 };
+      const current = counts.get(dateKey) || { leads: 0, tasks: 0, calls: 0 };
       if (event.type === 'lead') {
         current.leads++;
-      } else {
+      } else if (event.type === 'task') {
         current.tasks++;
+      } else if (event.type === 'call') {
+        current.calls++;
       }
       counts.set(dateKey, current);
     });
@@ -150,6 +180,9 @@ export default function CalendarView({ leads, tasks, title = "Calendar" }: Calen
         )}
         {counts.tasks > 0 && (
           <div className="w-1.5 h-1.5 rounded-full bg-blue-500" title={`${counts.tasks} task deadlines`} />
+        )}
+        {counts.calls > 0 && (
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" title={`${counts.calls} calls`} />
         )}
       </div>
     );
@@ -190,7 +223,7 @@ export default function CalendarView({ leads, tasks, title = "Calendar" }: Calen
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mb-4">
+      <div className="flex flex-wrap items-center gap-4 mb-4">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-emerald-500" />
           <span className="text-xs text-muted-foreground">Lead Follow-ups</span>
@@ -198,6 +231,10 @@ export default function CalendarView({ leads, tasks, title = "Calendar" }: Calen
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-blue-500" />
           <span className="text-xs text-muted-foreground">Task Deadlines</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-amber-500" />
+          <span className="text-xs text-muted-foreground">Calls</span>
         </div>
       </div>
 
@@ -262,13 +299,17 @@ export default function CalendarView({ leads, tasks, title = "Calendar" }: Calen
                           className={`p-3 rounded-lg border transition-all hover:shadow-md ${
                             event.type === 'lead'
                               ? 'border-emerald-500/30 bg-emerald-500/5'
-                              : 'border-blue-500/30 bg-blue-500/5'
+                              : event.type === 'task'
+                                ? 'border-blue-500/30 bg-blue-500/5'
+                                : 'border-amber-500/30 bg-amber-500/5'
                           }`}
                         >
                           {event.type === 'lead' ? (
                             <LeadEventCard lead={event.data as Lead} />
-                          ) : (
+                          ) : event.type === 'task' ? (
                             <TaskEventCard task={event.data as Task} />
+                          ) : (
+                            <CallEventCard call={event.data as Call} isReminder={event.isReminder} />
                           )}
                         </div>
                       ))}
@@ -363,6 +404,56 @@ function TaskEventCard({ task }: { task: Task }) {
       {latestNote && (
         <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-md">
           {latestNote.content}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CallEventCard({ call, isReminder }: { call: Call; isReminder?: boolean }) {
+  const handleCall = () => {
+    window.location.href = `tel:${call.phone}`;
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shrink-0">
+            {isReminder ? <Bell className="w-4 h-4 text-white" /> : <Phone className="w-4 h-4 text-white" />}
+          </div>
+          <div>
+            <p className="font-medium text-sm text-foreground">{call.name || 'Unknown'}</p>
+            <p className="text-xs text-muted-foreground">
+              {isReminder ? 'Call Reminder' : 'Call Record'}
+            </p>
+          </div>
+        </div>
+        <CallStatusChip status={call.status} />
+      </div>
+      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+        <button 
+          onClick={handleCall}
+          className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+        >
+          <Phone className="w-3 h-3" />
+          {call.phone}
+        </button>
+        {call.callTime && (
+          <span className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {call.callTime}
+          </span>
+        )}
+        {call.source && (
+          <span className="capitalize">
+            Source: {call.source.replace('_', ' ')}
+          </span>
+        )}
+      </div>
+      {call.notes && (
+        <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-md">
+          {call.notes}
         </p>
       )}
     </div>

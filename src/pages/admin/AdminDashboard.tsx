@@ -163,7 +163,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Calendar View */}
-        <CalendarView leads={leads} tasks={tasks} title="All Events Calendar" />
+        <CalendarView leads={leads} tasks={tasks} calls={calls} title="All Events Calendar" />
       </div>
     </div>
   );

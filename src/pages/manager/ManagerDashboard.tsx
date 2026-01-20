@@ -194,7 +194,7 @@ export default function ManagerDashboard() {
         </div>
 
         {/* Calendar View */}
-        <CalendarView leads={leads} tasks={tasks} title="Team Calendar" />
+        <CalendarView leads={leads} tasks={tasks} calls={calls} title="Team Calendar" />
       </div>
     </div>
   );
