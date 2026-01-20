@@ -3,6 +3,7 @@ import TopBar from '@/components/layout/TopBar';
 import StaffPerformanceChart from '@/components/reports/StaffPerformanceChart';
 import DailyLeadsPercentageChart from '@/components/reports/DailyLeadsPercentageChart';
 import MonthlyLeavesChart from '@/components/reports/MonthlyLeavesChart';
+import CallVolumeChart from '@/components/reports/CallVolumeChart';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { format, isWithinInterval, startOfDay, endOfDay, subDays, subMonths } fr
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
+import { useCalls } from '@/contexts/CallsContext';
 
 interface LeaveRecord {
   id: string;
@@ -45,6 +47,7 @@ type DateRange = {
 export default function ManagerReports() {
   const { user } = useAuth();
   const { leads, tasks } = useData();
+  const { calls } = useCalls();
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -429,6 +432,12 @@ export default function ManagerReports() {
             users={filteredUsers}
             leaves={convertedLeaves}
           />
+        </div>
+
+        {/* Call Statistics Section */}
+        <div className="pt-4">
+          <h2 className="text-xl font-semibold mb-4">Call Statistics</h2>
+          <CallVolumeChart calls={calls} dateRange={dateRange} />
         </div>
       </div>
     </div>

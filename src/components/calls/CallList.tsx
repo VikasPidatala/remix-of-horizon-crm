@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, Phone, Calendar, Clock, ArrowRight, Trash2, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, isSameDay, parseISO, startOfDay } from 'date-fns';
+import { format, isSameDay, parseISO, addDays, subDays, startOfDay, eachDayOfInterval } from 'date-fns';
 import CallStatusChip from './CallStatusChip';
 import { cn } from '@/lib/utils';
 
@@ -49,19 +49,15 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: C
       grouped[dateKey].push(call);
     });
 
-    // Sort dates in descending order
-    return Object.entries(grouped)
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .reduce((acc, [key, value]) => {
-        acc[key] = value;
-        return acc;
-      }, {} as Record<string, Call[]>);
+    return grouped;
   }, [calls]);
 
-  // Get unique dates for calendar navigation
-  const availableDates = useMemo(() => {
-    return Object.keys(callsByDate).map(d => parseISO(d));
-  }, [callsByDate]);
+  // Get 7 days around selected date for calendar strip
+  const calendarDays = useMemo(() => {
+    const start = subDays(selectedDate, 3);
+    const end = addDays(selectedDate, 3);
+    return eachDayOfInterval({ start, end });
+  }, [selectedDate]);
 
   // Filter calls for selected date
   const filteredCalls = useMemo(() => {
@@ -85,18 +81,19 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: C
   }, [callsByDate, selectedDate, statusFilter, searchTerm]);
 
   const navigateDate = (direction: 'prev' | 'next') => {
-    const sortedDates = availableDates.sort((a, b) => a.getTime() - b.getTime());
-    const currentIndex = sortedDates.findIndex(d => isSameDay(d, selectedDate));
-    
-    if (direction === 'prev' && currentIndex > 0) {
-      setSelectedDate(sortedDates[currentIndex - 1]);
-    } else if (direction === 'next' && currentIndex < sortedDates.length - 1) {
-      setSelectedDate(sortedDates[currentIndex + 1]);
+    if (direction === 'prev') {
+      setSelectedDate(subDays(selectedDate, 1));
+    } else {
+      setSelectedDate(addDays(selectedDate, 1));
     }
   };
 
+  const handleCall = (phone: string) => {
+    window.location.href = `tel:${phone}`;
+  };
+
   const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
-  const hasCallsOnSelectedDate = callsByDate[selectedDateKey]?.length > 0;
+  const callCountForSelectedDate = callsByDate[selectedDateKey]?.length || 0;
 
   return (
     <div className="space-y-4">
@@ -126,72 +123,85 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: C
         </Select>
       </div>
 
-      {/* Date Navigation */}
+      {/* Simple Calendar Strip */}
       <Card>
-        <CardHeader className="py-3">
-          <div className="flex items-center justify-between">
+        <CardContent className="py-4">
+          {/* Date Header with Navigation */}
+          <div className="flex items-center justify-between mb-4">
             <Button
-              variant="ghost"
+              variant="default"
               size="icon"
               onClick={() => navigateDate('prev')}
-              disabled={!availableDates.some(d => d < selectedDate)}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-lg font-medium">
+              <span className="text-lg font-medium">
                 {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-              </CardTitle>
-              {hasCallsOnSelectedDate && (
-                <Badge variant="secondary" className="ml-2">
-                  {callsByDate[selectedDateKey].length} calls
-                </Badge>
-              )}
+              </span>
+              <Badge variant="secondary" className="ml-2">
+                {callCountForSelectedDate} calls
+              </Badge>
             </div>
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               onClick={() => navigateDate('next')}
-              disabled={!availableDates.some(d => d > selectedDate)}
+              className="rounded-lg"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        </CardHeader>
-      </Card>
 
-      {/* Date Quick Select */}
-      <ScrollArea className="w-full">
-        <div className="flex gap-2 pb-2">
-          {Object.entries(callsByDate).slice(0, 14).map(([dateKey, dateCalls]) => {
-            const date = parseISO(dateKey);
-            const isSelected = isSameDay(date, selectedDate);
-            return (
-              <Button
-                key={dateKey}
-                variant={isSelected ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedDate(date)}
-                className="flex-shrink-0"
-              >
-                <div className="text-center">
-                  <div className="text-xs">{format(date, 'MMM d')}</div>
-                  <Badge variant={isSelected ? 'secondary' : 'outline'} className="mt-1 text-xs">
-                    {dateCalls.length}
-                  </Badge>
-                </div>
-              </Button>
-            );
-          })}
-        </div>
-      </ScrollArea>
+          {/* Horizontal Calendar Strip */}
+          <div className="flex justify-center gap-2">
+            {calendarDays.map((day) => {
+              const dateKey = format(day, 'yyyy-MM-dd');
+              const isSelected = isSameDay(day, selectedDate);
+              const isToday = isSameDay(day, new Date());
+              const callCount = callsByDate[dateKey]?.length || 0;
+              
+              return (
+                <button
+                  key={dateKey}
+                  onClick={() => setSelectedDate(day)}
+                  className={cn(
+                    "flex flex-col items-center p-2 rounded-lg min-w-[60px] transition-all",
+                    isSelected 
+                      ? "bg-primary text-primary-foreground" 
+                      : isToday
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-muted"
+                  )}
+                >
+                  <span className="text-xs font-medium">
+                    {format(day, 'MMM d')}
+                  </span>
+                  {callCount > 0 && (
+                    <Badge 
+                      variant={isSelected ? "secondary" : "outline"} 
+                      className={cn(
+                        "mt-1 text-xs px-2 py-0",
+                        isSelected && "bg-primary-foreground/20 text-primary-foreground border-0"
+                      )}
+                    >
+                      {callCount}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Calls Table */}
       {filteredCalls.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            {hasCallsOnSelectedDate 
+            {callCountForSelectedDate > 0
               ? 'No calls match your search criteria'
               : 'No calls recorded for this date'}
           </CardContent>
@@ -216,10 +226,16 @@ export default function CallList({ calls, onEdit, onDelete, onConvertToLead }: C
                 {filteredCalls.map((call) => (
                   <TableRow key={call.id}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{call.phone}</span>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCall(call.phone)}
+                        className="flex items-center gap-2 text-primary hover:text-primary hover:bg-primary/10 p-0 h-auto font-medium"
+                        title="Click to call"
+                      >
+                        <Phone className="h-4 w-4" />
+                        {call.phone}
+                      </Button>
                     </TableCell>
                     <TableCell>{call.name || '-'}</TableCell>
                     <TableCell>{call.email || '-'}</TableCell>
